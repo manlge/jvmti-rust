@@ -33,11 +33,11 @@ fn main() {
                             _ => println!("Unknown action: {}", action)
                         }
                     },
-                    Err(err) => assert!(false, format!("{:?}", err))
+                    Err(err) => assert!(false, "{}", err)
                 }
 
             },
-            Err(err) => assert!(false, format!("{:?}", err))
+            Err(err) => assert!(false, "{}", err)
         }
     } else {
         println!("Invalid arguments. Usage: jvmti [read|write] <Class file>")

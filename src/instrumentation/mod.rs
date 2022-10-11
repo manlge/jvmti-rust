@@ -2,6 +2,7 @@ use super::bytecode::classfile::*;
 
 pub mod asm;
 
+#[derive(PartialEq)]
 pub enum JavaType {
     Boolean,
     String,
@@ -14,6 +15,7 @@ pub enum JavaType {
     Void
 }
 
+#[derive(PartialEq)]
 pub struct JavaClass {
     methods: Vec<Method>,
     fields: Vec<Field>
@@ -41,6 +43,7 @@ impl JavaClass {
     }
 }
 
+#[derive(PartialEq)]
 pub struct Field {
     name: String,
     field_type: JavaType
@@ -55,6 +58,7 @@ impl Field {
     }
 }
 
+#[derive(PartialEq)]
 pub struct Method {
     name: String,
     return_type: JavaType

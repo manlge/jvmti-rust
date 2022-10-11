@@ -4,7 +4,7 @@
 /// itself, it doesn't represent every byte in the class definition, though, many information are
 /// encoded in the type system instead. This approach may seem restrictive but it helps achieving
 /// bytecode safety.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Classfile {
     pub version: ClassfileVersion,
     pub constant_pool: ConstantPool,
@@ -66,7 +66,7 @@ impl Default for ClassfileVersion {
 ///
 /// A `ConstantPool` is a table of various string and number literal constants that are referred
 /// within the substructures of the `Classfile`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ConstantPool {
     pub constants: Vec<Constant>
 }
@@ -239,7 +239,7 @@ impl ReferenceKind {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct AccessFlags {
     pub flags: u16
 }
@@ -323,7 +323,7 @@ pub enum ParameterAccessFlags {
     Mandated = 0x8000
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Field {
     pub access_flags: AccessFlags,
     pub name_index: ConstantPoolIndex,
@@ -331,7 +331,7 @@ pub struct Field {
     pub attributes: Vec<Attribute>
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Method {
     pub access_flags: AccessFlags,
     pub name_index: ConstantPoolIndex,
@@ -339,7 +339,7 @@ pub struct Method {
     pub attributes: Vec<Attribute>
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Attribute {
     ConstantValue(ConstantPoolIndex),
     Code { max_stack: u16, max_locals: u16, code: Vec<Instruction>, exception_table: Vec<ExceptionHandler>, attributes: Vec<Attribute> },
@@ -367,7 +367,7 @@ pub enum Attribute {
     RawAttribute { name_index: ConstantPoolIndex, info: Vec<u8> }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StackMapFrame {
     SameFrame { tag: u8 },
     SameLocals1StackItemFrame { tag: u8, stack: VerificationType },
@@ -394,7 +394,7 @@ impl StackMapFrame {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum VerificationType {
     Top,
     Integer,
@@ -417,7 +417,7 @@ impl VerificationType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ExceptionHandler {
     pub start_pc: u16,
     pub end_pc: u16,
@@ -425,7 +425,7 @@ pub struct ExceptionHandler {
     pub catch_type: ConstantPoolIndex
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct InnerClass {
     pub inner_class_info_index: ConstantPoolIndex,
     pub outer_class_info_index: ConstantPoolIndex,
@@ -433,13 +433,13 @@ pub struct InnerClass {
     pub access_flags: AccessFlags
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LineNumberTable {
     pub start_pc: u16,
     pub line_number: u16
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LocalVariableTable {
     pub start_pc: u16,
     pub length: u16,
@@ -448,7 +448,7 @@ pub struct LocalVariableTable {
     pub index: u16
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LocalVariableTypeTable {
     pub start_pc: u16,
     pub length: u16,
@@ -457,7 +457,7 @@ pub struct LocalVariableTypeTable {
     pub index: u16
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Annotation {
     pub type_index: ConstantPoolIndex,
     pub element_value_pairs: Vec<ElementValuePair>
@@ -470,7 +470,7 @@ impl Annotation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ElementValuePair {
     pub element_name_index: ConstantPoolIndex,
     pub value: ElementValue
@@ -482,7 +482,7 @@ impl ElementValuePair {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ElementValue {
     ConstantValue(u8, ConstantPoolIndex),
     Enum { type_name_index: ConstantPoolIndex, const_name_index: ConstantPoolIndex },
@@ -503,7 +503,7 @@ impl ElementValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TypeAnnotation {
     pub target_info: TargetInfo,
     pub target_path: TypePath,
@@ -517,7 +517,7 @@ impl TypeAnnotation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TargetInfo {
     TypeParameter { subtype: u8, idx: u8 },
     SuperType { idx: u16 },
@@ -563,7 +563,7 @@ impl TargetInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TypePath {
     pub path: Vec<(TypePathKind, u8)>
 }
@@ -574,7 +574,7 @@ impl TypePath {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TypePathKind {
     Array, // Annotation is deeper in an array type
     Nested, // Annotation is deeper in a nested type
@@ -593,7 +593,7 @@ impl TypePathKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct BootstrapMethod {
     pub bootstrap_method_ref: ConstantPoolIndex,
     pub bootstrap_arguments: Vec<ConstantPoolIndex>
@@ -602,7 +602,7 @@ pub struct BootstrapMethod {
 impl BootstrapMethod {
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MethodParameter {
     pub name_index: ConstantPoolIndex,
     pub access_flags: AccessFlags
@@ -613,7 +613,7 @@ impl MethodParameter {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Instruction {
     AALOAD,
     AASTORE,
