@@ -1,18 +1,12 @@
 [package]
 name = "jvmti-sample"
-version = "0.4.0"
-authors = [ "Alex Pecsi <xea@blacklight.so>" ]
-description = "JVM Monitoring and profiling agent"
+version = "0.5.0"
+authors = [ "Robert Lu <robberphex@gmail.com>" ]
+description = "Java native agent example"
 keywords = [ "java", "jvm", "jvmti", "debugger" ]
 
 [lib]
 crate_type = [ "cdylib", "rlib" ]
 
 [dependencies]
-libc = "0.2.*"
-time = "0.1.*"
-lazy_static = "0.2.*"
-toml = "0.4.*"
-serde = "1.0.*"
-serde_derive = "1.0.*"
-jvmti = {path = "../jvmti", version = "0.4.0"}
+jvmti = {path = "../jvmti", version = "0.5.0"}

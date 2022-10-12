@@ -1,4 +1,4 @@
-rust-jvmti
+jvmti-rust
 ==========
 
 An extensible, safe native JVM agent implemented in pure Rust.
@@ -25,4 +25,4 @@ JVM functionality via Rust and byte code instrumentation using Java code.
 
 ## Usage
 
-Please see [the example](./sample/README.md).
+Please see [the example](../sample/README.md).

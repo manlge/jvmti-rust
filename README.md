@@ -1,4 +1,4 @@
-rust-jvmti
+jvmti-rust
 ==========
 
 An extensible, safe native JVM agent implemented in pure Rust.

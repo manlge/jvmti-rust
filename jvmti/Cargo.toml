@@ -1,9 +1,15 @@
 [package]
 name = "jvmti"
-version = "0.4.0"
-authors = [ "Alex Pecsi <xea@blacklight.so>" ]
-description = "JVM Monitoring and profiling agent"
+version = "0.5.0"
+authors = [
+  "Alex Pecsi <xea@blacklight.so>",
+  "Robert Lu <robberphex@gmail.com>"
+]
+license = "Apache-2.0"
+description = "JVM TI Rust binding"
 keywords = [ "java", "jvm", "jvmti", "debugger" ]
+documentation = "https://github.com/robberphex/jvmti-rust"
+repository = "https://github.com/robberphex/jvmti-rust.git"
 
 [lib]
 crate_type = [ "cdylib", "rlib" ]
