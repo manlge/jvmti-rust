@@ -15,11 +15,10 @@ pub enum JavaType<'a> {
     Short,
     Void,
     Class(&'a str),
-    Array(Box<JavaType<'a>>)
+    Array(Box<JavaType<'a>>),
 }
 
 impl<'a> JavaType<'a> {
-
     /// Convert a given type signature into a JavaType instance (if possible). None is returned
     /// if the conversation was not successful.
     pub fn parse(signature: &'a str) -> Option<JavaType<'a>> {
@@ -35,22 +34,20 @@ impl<'a> JavaType<'a> {
                 "S" => Some(JavaType::Short),
                 "V" => Some(JavaType::Void),
                 "Z" => Some(JavaType::Boolean),
-                _ => None
+                _ => None,
             },
-            _ => {
-                match signature.chars().nth(0).unwrap() {
-                    '[' => {
-                        let (_, local_type) = signature.split_at(1);
+            _ => match signature.chars().nth(0).unwrap() {
+                '[' => {
+                    let (_, local_type) = signature.split_at(1);
 
-                        match JavaType::parse(local_type) {
-                            Some(result) => Some(JavaType::Array(Box::new(result))),
-                            None => None
-                        }
-                    },
-                    'L' => Some(JavaType::Class(signature)),
-                    _ => None
+                    match JavaType::parse(local_type) {
+                        Some(result) => Some(JavaType::Array(Box::new(result))),
+                        None => None,
+                    }
                 }
-            }
+                'L' => Some(JavaType::Class(signature)),
+                _ => None,
+            },
         }
     }
 
@@ -69,7 +66,12 @@ impl<'a> JavaType<'a> {
             JavaType::Void => "void".to_string(),
             JavaType::Boolean => "boolean".to_string(),
             JavaType::Array(ref inner_type) => format!("{}[]", JavaType::to_string(inner_type)),
-            JavaType::Class(cls) => cls.trim_left_matches("L").trim_right_matches(";").replace(";", "").replace("/", ".").to_string()
+            JavaType::Class(cls) => cls
+                .trim_left_matches("L")
+                .trim_right_matches(";")
+                .replace(";", "")
+                .replace("/", ".")
+                .to_string(),
         }
     }
 }
@@ -78,17 +80,17 @@ impl<'a> JavaType<'a> {
 /// Represents a JNI local reference to a Java class
 ///
 pub struct ClassId {
-    pub native_id: JavaClass
+    pub native_id: JavaClass,
 }
 
 pub struct ClassSignature {
     pub package: String,
-    pub name: String
+    pub name: String,
+    pub native_sig: String,
 }
 
 impl ClassSignature {
-
-    pub fn new(java_type: &JavaType) -> ClassSignature {
+    pub fn new(java_type: &JavaType, native_sig: String) -> ClassSignature {
         let str = JavaType::to_string(java_type);
         match str.rfind('.') {
             Some(idx) => {
@@ -96,11 +98,15 @@ impl ClassSignature {
 
                 ClassSignature {
                     package: pkg.trim_right_matches(".").to_string(),
-                    name: name.to_string()
+                    name: name.to_string(),
+                    native_sig,
                 }
+            }
+            None => ClassSignature {
+                package: "".to_string(),
+                name: str.to_string(),
+                native_sig,
             },
-            None => ClassSignature { package: "".to_string(), name: str.to_string() }
-
         }
     }
 
@@ -114,14 +120,16 @@ impl ClassSignature {
 ///
 pub struct Class {
     pub id: ClassId,
-    pub signature: ClassSignature
+    pub signature: ClassSignature,
 }
 
 impl Class {
-
     /// Constructs a new Class instance.
-    pub fn new<'a>(id: ClassId, signature: JavaType<'a>) -> Class {
-        Class { id: id, signature: ClassSignature::new(&signature) }
+    pub fn new<'a>(id: ClassId, signature: JavaType<'a>, native_sig: String) -> Class {
+        Class {
+            id: id,
+            signature: ClassSignature::new(&signature, native_sig),
+        }
     }
 
     /// Returns the readable name of this class

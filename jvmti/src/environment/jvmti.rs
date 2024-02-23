@@ -1,3 +1,5 @@
+use crate::native::jvmti_native::*;
+
 use super::super::capabilities::Capabilities;
 use super::super::class::{ClassId, ClassSignature, JavaType};
 use super::super::error::{wrap_error, NativeError};
@@ -5,15 +7,20 @@ use super::super::event::{EventCallbacks, VMEvent};
 use super::super::event_handler::*;
 use super::super::mem::MemoryAllocation;
 use super::super::method::{MethodId, MethodSignature};
-use super::super::thread::{ThreadId, Thread};
+use super::super::native::jvmti_native::{jvmtiCapabilities, Struct__jvmtiThreadInfo};
+use super::super::native::{
+    JVMTIEnvPtr, JavaClass, JavaInstance, JavaLong, JavaObject, JavaThread, MutByteArray, MutString,
+};
+use super::super::thread::{Thread, ThreadId};
 use super::super::util::stringify;
 use super::super::version::VersionNumber;
-use super::super::native::{MutString, MutByteArray, JavaClass, JavaObject, JavaInstance, JavaLong, JavaThread, JVMTIEnvPtr};
-use super::super::native::jvmti_native::{Struct__jvmtiThreadInfo, jvmtiCapabilities};
-use std::ptr;
+use std::{
+    ffi::{c_char, CStr, CString},
+    os::raw::c_void,
+    ptr,
+};
 
 pub trait JVMTI {
-
     ///
     /// Return the JVM TI version number, which includes major, minor and micro version numbers.
     ///
@@ -21,7 +28,10 @@ pub trait JVMTI {
     /// Set new capabilities by adding the capabilities whose values are set to true in new_caps.
     /// All previous capabilities are retained.
     /// Some virtual machines may allow a limited set of capabilities to be added in the live phase.
-    fn add_capabilities(&mut self, new_capabilities: &Capabilities) -> Result<Capabilities, NativeError>;
+    fn add_capabilities(
+        &mut self,
+        new_capabilities: &Capabilities,
+    ) -> Result<Capabilities, NativeError>;
     fn get_capabilities(&self) -> Capabilities;
     /// Set the functions to be called for each event. The callbacks are specified by supplying a
     /// replacement function table. The function table is copied--changes to the local copy of the
@@ -33,15 +43,36 @@ pub trait JVMTI {
     fn set_event_notification_mode(&mut self, event: VMEvent, mode: bool) -> Option<NativeError>;
     fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError>;
     fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError>;
-    fn get_method_name(&self, method_id: &MethodId) -> Result<MethodSignature, NativeError>;
+    fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError>;
     fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError>;
     fn allocate(&self, len: usize) -> Result<MemoryAllocation, NativeError>;
     fn deallocate(&self);
+    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError>;
+    fn get_local_object(
+        &self,
+        thread: jthread,
+        depth: jint,
+        slot: jint,
+    ) -> Result<jobject, NativeError>;
+    fn run_agent_thread(
+        &self,
+        thread: jthread,
+        proc: jvmtiStartFunction,
+        arg: *const c_void,
+        priority: jint,
+    ) -> Result<(), NativeError>;
+    fn get_stack_trace(&self, thread: jthread) -> Result<(), NativeError>;
+    fn get_thread_state(&self, thread: jthread) -> Result<u32, NativeError>;
+    fn add_to_bootstrap_classloader_search(&self, class_path: &str) -> Result<(), NativeError>;
+    fn raw_monitor_enter(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
+    fn raw_monitor_exit(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
+    fn create_raw_monitor(&self, name: &str) -> Result<jrawMonitorID, NativeError>;
+    fn destroy_raw_monitor(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
+    fn retransform_classes(&self, count: jint, class: *const jclass) -> Result<(), NativeError>;
 }
 
 pub struct JVMTIEnvironment {
-
-    jvmti: JVMTIEnvPtr
+    jvmti: JVMTIEnvPtr,
 }
 
 impl JVMTIEnvironment {
@@ -51,7 +82,6 @@ impl JVMTIEnvironment {
 }
 
 impl JVMTI for JVMTIEnvironment {
-
     fn get_version_number(&self) -> VersionNumber {
         unsafe {
             let mut version: i32 = 0;
@@ -62,14 +92,19 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn add_capabilities(&mut self, new_capabilities: &Capabilities) -> Result<Capabilities, NativeError> {
+    fn add_capabilities(
+        &mut self,
+        new_capabilities: &Capabilities,
+    ) -> Result<Capabilities, NativeError> {
         let native_caps = new_capabilities.to_native();
-        let caps_ptr:*const jvmtiCapabilities = &native_caps;
+        let caps_ptr: *const jvmtiCapabilities = &native_caps;
 
         unsafe {
-            match wrap_error((**self.jvmti).AddCapabilities.unwrap()(self.jvmti, caps_ptr)) {
+            match wrap_error((**self.jvmti).AddCapabilities.unwrap()(
+                self.jvmti, caps_ptr,
+            )) {
                 NativeError::NoError => Ok(self.get_capabilities()),
-                err @ _ => Err(err)
+                err @ _ => Err(err),
             }
         }
     }
@@ -110,61 +145,103 @@ impl JVMTI for JVMTIEnvironment {
         let (native_callbacks, callbacks_size) = registered_callbacks();
 
         unsafe {
-            match wrap_error((**self.jvmti).SetEventCallbacks.unwrap()(self.jvmti, &native_callbacks, callbacks_size)) {
+            match wrap_error((**self.jvmti).SetEventCallbacks.unwrap()(
+                self.jvmti,
+                &native_callbacks,
+                callbacks_size,
+            )) {
                 NativeError::NoError => None,
-                err @ _ => Some(err)
+                err @ _ => Some(err),
             }
         }
     }
 
     fn set_event_notification_mode(&mut self, event: VMEvent, mode: bool) -> Option<NativeError> {
         unsafe {
-            let mode_i = match mode { true => 1, false => 0 };
+            let mode_i = match mode {
+                true => 1,
+                false => 0,
+            };
             let sptr: JavaObject = ptr::null_mut();
 
-            match wrap_error((**self.jvmti).SetEventNotificationMode.unwrap()(self.jvmti, mode_i, event as u32, sptr)) {
+            match wrap_error((**self.jvmti).SetEventNotificationMode.unwrap()(
+                self.jvmti,
+                mode_i,
+                event as u32,
+                sptr,
+            )) {
                 NativeError::NoError => None,
-                err @ _ => Some(err)
+                err @ _ => Some(err),
             }
         }
     }
 
     fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError> {
-        let mut info = Struct__jvmtiThreadInfo { name: ptr::null_mut(), priority: 0, is_daemon: 0, thread_group: ptr::null_mut(), context_class_loader: ptr::null_mut()};
+        let mut info = Struct__jvmtiThreadInfo {
+            name: ptr::null_mut(),
+            priority: 0,
+            is_daemon: 0,
+            thread_group: ptr::null_mut(),
+            context_class_loader: ptr::null_mut(),
+        };
         let mut info_ptr = &mut info;
 
         unsafe {
             match (**self.jvmti).GetThreadInfo {
-                Some(func) => {
-                    match wrap_error(func(self.jvmti, *thread_id, info_ptr)) {
-                        NativeError::NoError => Ok(Thread {
-                            id: ThreadId { native_id: *thread_id },
-                            name: stringify((*info_ptr).name),
-                            priority: (*info_ptr).priority as u32,
-                            is_daemon: if (*info_ptr).is_daemon > 0 { true } else { false }
-                        }),
-                        err@_ => Err(err)
-                    }
+                Some(func) => match wrap_error(func(self.jvmti, *thread_id, info_ptr)) {
+                    NativeError::NoError => Ok(Thread {
+                        id: ThreadId {
+                            native_id: *thread_id,
+                        },
+                        name: stringify((*info_ptr).name),
+                        priority: (*info_ptr).priority as u32,
+                        is_daemon: if (*info_ptr).is_daemon > 0 {
+                            true
+                        } else {
+                            false
+                        },
+                    }),
+                    err @ _ => Err(err),
                 },
-                None => Err(NativeError::NoError)
+                None => Err(NativeError::NoError),
+            }
+        }
+    }
+
+    fn get_thread_state(&self, thread: jthread) -> Result<u32, NativeError> {
+        let mut state: jint = 0;
+        unsafe {
+            match wrap_error((**self.jvmti).GetThreadState.unwrap()(
+                self.jvmti, thread, &mut state,
+            )) {
+                NativeError::NoError => Ok(state as u32 & JVMTI_JAVA_LANG_THREAD_STATE_MASK),
+                err @ _ => Err(err),
             }
         }
     }
 
     fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError> {
-        let mut jstruct: JavaInstance = JavaInstance { _hacky_hack_workaround: 0 };
+        let mut jstruct: JavaInstance = JavaInstance {
+            _hacky_hack_workaround: 0,
+        };
         let mut jclass_instance: JavaClass = &mut jstruct;
         let meta_ptr: *mut JavaClass = &mut jclass_instance;
 
         unsafe {
-            match wrap_error((**self.jvmti).GetMethodDeclaringClass.unwrap()(self.jvmti, method_id.native_id, meta_ptr)) {
-                NativeError::NoError => Ok(ClassId { native_id: *meta_ptr }),
-                err @ _ => Err(err)
+            match wrap_error((**self.jvmti).GetMethodDeclaringClass.unwrap()(
+                self.jvmti,
+                method_id.native_id,
+                meta_ptr,
+            )) {
+                NativeError::NoError => Ok(ClassId {
+                    native_id: *meta_ptr,
+                }),
+                err @ _ => Err(err),
             }
         }
     }
 
-    fn get_method_name(&self, method_id: &MethodId) -> Result<MethodSignature, NativeError> {
+    fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError> {
         let mut method_name = ptr::null_mut();
         let mut method_ptr = &mut method_name;
 
@@ -175,9 +252,18 @@ impl JVMTI for JVMTIEnvironment {
         let mut generic_sig_ptr = &mut generic_sig;
 
         unsafe {
-            match wrap_error((**self.jvmti).GetMethodName.unwrap()(self.jvmti, method_id.native_id, method_ptr, signature_ptr, generic_sig_ptr)) {
-                NativeError::NoError => Ok(MethodSignature::new(stringify(*method_ptr))),
-                err @ _ => Err(err)
+            match wrap_error((**self.jvmti).GetMethodName.unwrap()(
+                self.jvmti,
+                method_id,
+                method_ptr,
+                signature_ptr,
+                generic_sig_ptr,
+            )) {
+                NativeError::NoError => Ok(MethodSignature::new(
+                    stringify(*method_ptr),
+                    stringify(*signature_ptr),
+                )),
+                err @ _ => Err(err),
             }
         }
     }
@@ -189,9 +275,17 @@ impl JVMTI for JVMTIEnvironment {
             let p1: *mut MutString = &mut sig;
             let p2: *mut MutString = &mut native_sig;
 
-            match wrap_error((**self.jvmti).GetClassSignature.unwrap()(self.jvmti, class_id.native_id, p1, p2)) {
-                NativeError::NoError => Ok(ClassSignature::new(&JavaType::parse(&stringify(sig)).unwrap())),
-                err @ _ => Err(err)
+            match wrap_error((**self.jvmti).GetClassSignature.unwrap()(
+                self.jvmti,
+                class_id.native_id,
+                p1,
+                p2,
+            )) {
+                NativeError::NoError => Ok(ClassSignature::new(
+                    &JavaType::parse(&stringify(sig)).unwrap(),
+                    stringify(*p1),
+                )),
+                err @ _ => Err(err),
             }
         }
     }
@@ -204,12 +298,165 @@ impl JVMTI for JVMTIEnvironment {
         unsafe {
             match wrap_error((**self.jvmti).Allocate.unwrap()(self.jvmti, size, mem_ptr)) {
                 NativeError::NoError => Ok(MemoryAllocation { ptr: ptr, len: len }),
-                err @ _ => Err(err)
+                err @ _ => Err(err),
             }
         }
     }
 
-    fn deallocate(&self) {
+    fn deallocate(&self) {}
 
+    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+        let mut threads_count: jint = 0;
+        let mut threads_ptr: *mut jthread = std::ptr::null_mut();
+
+        unsafe {
+            match wrap_error((**self.jvmti).GetAllThreads.unwrap()(
+                self.jvmti,
+                &mut threads_count,
+                &mut threads_ptr,
+            )) {
+                NativeError::NoError => {
+                    let threads = Vec::from_raw_parts(
+                        threads_ptr,
+                        threads_count as usize,
+                        threads_count as usize,
+                    );
+
+                    Ok(threads)
+                }
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn run_agent_thread(
+        &self,
+        thread: jthread,
+        proc: jvmtiStartFunction,
+        arg: *const c_void,
+        priority: jint,
+    ) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).RunAgentThread.unwrap()(
+                self.jvmti, thread, proc, arg, priority,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_stack_trace(&self, thread: jthread) -> Result<(), NativeError> {
+        unsafe {
+            let mut count: jint = 0;
+            let mut info = vec![jvmtiFrameInfo::default(); 100];
+            // let stacktrace = std::slice::from_raw_parts(info, count as usize);
+            println!("stacktrace count: {}", count);
+            // for s in stacktrace {
+            //     let x = self.get_method_name(s.method).unwrap();
+            //     println!("name: {}, {}", x.name, x.signature);
+            // }
+
+            match wrap_error((**self.jvmti).GetStackTrace.unwrap()(
+                self.jvmti,
+                thread,
+                0,
+                100,
+                info.as_mut_ptr(),
+                &mut count,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_local_object(
+        &self,
+        thread: jthread,
+        depth: jint,
+        slot: jint,
+    ) -> Result<jobject, NativeError> {
+        unsafe {
+            let mut value: Struct__jobject = Struct__jobject {
+                _hacky_hack_workaround: 0,
+            };
+            let mut value: jobject = &mut value;
+            match wrap_error((**self.jvmti).GetLocalObject.unwrap()(
+                self.jvmti, thread, depth, slot, &mut value,
+            )) {
+                NativeError::NoError => Ok(value),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn add_to_bootstrap_classloader_search(&self, class_path: &str) -> Result<(), NativeError> {
+        let path = CString::new(class_path).unwrap();
+        unsafe {
+            match wrap_error((**self.jvmti).AddToBootstrapClassLoaderSearch.unwrap()(
+                self.jvmti,
+                path.as_ptr(),
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn raw_monitor_enter(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).RawMonitorEnter.unwrap()(self.jvmti, monitor)) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn raw_monitor_exit(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).RawMonitorExit.unwrap()(self.jvmti, monitor)) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn create_raw_monitor(&self, name: &str) -> Result<jrawMonitorID, NativeError> {
+        let mut monitor: jrawMonitorID = unsafe { std::mem::zeroed() };
+        let monitor_ptr: *mut jrawMonitorID = &mut monitor;
+        unsafe {
+            let name = CString::new(name).unwrap();
+            match wrap_error((**self.jvmti).CreateRawMonitor.unwrap()(
+                self.jvmti,
+                name.as_ptr(),
+                monitor_ptr,
+            )) {
+                NativeError::NoError => Ok(monitor),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn destroy_raw_monitor(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).DestroyRawMonitor.unwrap()(
+                self.jvmti, monitor,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn retransform_classes(&self, count: jint, class: *const jclass) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).RetransformClasses.unwrap()(
+                self.jvmti, count, class,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
     }
 }

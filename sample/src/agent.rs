@@ -1,20 +1,34 @@
-
 /*
  * TODO The functions below are essentially parts of an actual client implementation. Because this
  * implementation is highly experimental and incomplete they shall remain here for a while but
  * they will have to find a new home, eventually
  */
 
-use jvmti::{runtime::{MethodInvocationEvent, ObjectAllocationEvent, ClassFileLoadEvent}, context::static_context, thread::Thread, instrumentation::asm::transformer::Transformer, bytecode::{Constant, printer::ClassfilePrinter}};
+use jvmti::{
+    bytecode::{printer::ClassfilePrinter, Constant},
+    context::static_context,
+    instrumentation::asm::transformer::Transformer,
+    runtime::{ClassFileLoadEvent, MethodInvocationEvent, ObjectAllocationEvent},
+    thread::Thread,
+};
 
 pub fn on_method_entry(event: MethodInvocationEvent) {
     let shall_record = match static_context().config.read() {
-        Ok(cfg) => (*cfg).entry_points.iter().any(|item| *item == format!("{}.{}.{}", event.class_sig.package, event.class_sig.name, event.method_sig.name) ), //event.class_name.as_str() == item),
-        _ => false
+        Ok(cfg) => (*cfg).entry_points.iter().any(|item| {
+            *item
+                == format!(
+                    "{}.{}.{}",
+                    event.class_sig.package, event.class_sig.name, event.method_sig.name
+                )
+        }), //event.class_name.as_str() == item),
+        _ => false,
     };
 
     if !shall_record {
-        println!("[M-{}.{}{}]", event.class_sig.package, event.class_sig.name, event.method_sig.name);
+        println!(
+            "[M-{}.{}{}]",
+            event.class_sig.package, event.class_sig.name, event.method_sig.name
+        );
     }
 
     static_context().method_enter(&event.thread.id);
@@ -24,7 +38,7 @@ pub fn on_method_exit(event: MethodInvocationEvent) {
     match static_context().method_exit(&event.thread.id) {
         //Some(_) => (),
         Some(duration) => println!("Method {} exited after {}", event.method_sig.name, duration),
-        None => println!("Method has no start: {}", event.method_sig.name)
+        None => println!("Method has no start: {}", event.method_sig.name),
     }
 }
 
@@ -39,7 +53,7 @@ pub fn on_thread_end(thread: Thread) {
 
     match static_context().thread_end(&thread.id) {
         Some(duration) => println!("Thread {} lived {}", thread.name, duration),
-        None => println!("Thread {} has no start", thread.name)
+        None => println!("Thread {} has no start", thread.name),
     }
 }
 
@@ -62,26 +76,33 @@ pub fn on_monitor_contended_entered(thread: Thread) {
 
     match static_context().monitor_entered(&thread.id) {
         Some(duration) => println!("Thread {} waited {}", thread.name, duration),
-        None => println!("Thread {} has never waited", thread.name)
+        None => println!("Thread {} has never waited", thread.name),
     }
 }
 
 pub fn on_class_file_load(mut event: ClassFileLoadEvent) -> Option<Vec<u8>> {
     let shall_transform = match static_context().config.read() {
-        Ok(cfg) => (*cfg).entry_points.iter().any(|item| item.starts_with(event.class_name.as_str())), //event.class_name.as_str() == item),
-        _ => false
+        Ok(cfg) => (*cfg)
+            .entry_points
+            .iter()
+            .any(|item| item.starts_with(event.class_name.as_str())), //event.class_name.as_str() == item),
+        _ => false,
     };
 
     if shall_transform {
         {
             let mut transformer = Transformer::new(&mut event.class);
-            let result = transformer.ensure_constant(Constant::Utf8(String::from("Cde").into_bytes()));
+            let result =
+                transformer.ensure_constant(Constant::Utf8(String::from("Cde").into_bytes()));
 
             println!("Result: {:?}", result);
         }
-        let _: Vec<()> = ClassfilePrinter::render_lines(&event.class).iter().map(|line| println!("{}", line)).collect();
+        let _: Vec<()> = ClassfilePrinter::render_lines(&event.class)
+            .iter()
+            .map(|line| println!("{}", line))
+            .collect();
     }
-/*
+    /*
     let output_class: Vec<u8> = vec![];
     let mut write_cursor = Cursor::new(output_class);
 

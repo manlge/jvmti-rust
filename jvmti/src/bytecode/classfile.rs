@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 
 ///
 /// A `Classfile` represents a definition of a single JVM class or interface. Unlike the bytecode
@@ -14,7 +15,7 @@ pub struct Classfile {
     pub interfaces: Vec<ConstantPoolIndex>,
     pub fields: Vec<Field>,
     pub methods: Vec<Method>,
-    pub attributes: Vec<Attribute>
+    pub attributes: Vec<Attribute>,
 }
 
 impl Classfile {
@@ -35,7 +36,7 @@ impl Default for Classfile {
             interfaces: vec![],
             fields: vec![],
             methods: vec![],
-            attributes: vec![]
+            attributes: vec![],
         }
     }
 }
@@ -45,12 +46,15 @@ impl Default for Classfile {
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct ClassfileVersion {
     pub minor_version: u16,
-    pub major_version: u16
+    pub major_version: u16,
 }
 
 impl ClassfileVersion {
     pub fn new(major_version: u16, minor_version: u16) -> ClassfileVersion {
-        ClassfileVersion { major_version: major_version, minor_version: minor_version }
+        ClassfileVersion {
+            major_version: major_version,
+            minor_version: minor_version,
+        }
     }
 }
 
@@ -59,7 +63,10 @@ impl Default for ClassfileVersion {
         const DEFAULT_MAJOR_VERSION: u16 = 52;
         const DEFAULT_MINOR_VERSION: u16 = 0;
 
-        ClassfileVersion { major_version: DEFAULT_MAJOR_VERSION, minor_version: DEFAULT_MINOR_VERSION }
+        ClassfileVersion {
+            major_version: DEFAULT_MAJOR_VERSION,
+            minor_version: DEFAULT_MINOR_VERSION,
+        }
     }
 }
 
@@ -68,13 +75,13 @@ impl Default for ClassfileVersion {
 /// within the substructures of the `Classfile`.
 #[derive(Debug, PartialEq)]
 pub struct ConstantPool {
-    pub constants: Vec<Constant>
+    pub constants: Vec<Constant>,
 }
 
 impl ConstantPool {
     pub fn new(constants: Vec<Constant>) -> ConstantPool {
         ConstantPool {
-            constants: constants
+            constants: constants,
         }
     }
 
@@ -82,9 +89,9 @@ impl ConstantPool {
         match self.constants.get(idx as usize) {
             Some(constant) => match constant {
                 &Constant::Utf8(ref bytes) => Some(bytes),
-                _ => None
+                _ => None,
             },
-            _ => None
+            _ => None,
         }
     }
 
@@ -92,27 +99,27 @@ impl ConstantPool {
         match self.get_utf8(idx) {
             Some(bytes) => match String::from_utf8(bytes.clone()) {
                 Ok(string) => Some(string),
-                _ => None
+                _ => None,
             },
-            _ => None
+            _ => None,
         }
     }
 
-    pub fn find_ut8_index(&self, utf8: &'static str) -> Option<usize> {
+    pub fn find_ut8_index(&self, utf8: &str) -> Option<usize> {
         for i in 0..self.constants.len() {
             match self.constants[i] {
                 Constant::Utf8(ref bytes) => {
                     if bytes.as_slice() == utf8.as_bytes() {
                         return Some(i);
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
         }
         None
     }
 
-    pub fn get_utf8_index(&self, utf8: &'static str) -> usize {
+    pub fn get_utf8_index(&self, utf8: &str) -> usize {
         self.find_ut8_index(utf8).unwrap_or(0)
     }
 
@@ -126,12 +133,18 @@ impl ConstantPool {
 
     pub fn add_constant(&mut self, constant: Constant) -> ConstantPoolIndex {
         self.constants.push(constant);
-        ConstantPoolIndex::new(self.cp_len())
+        ConstantPoolIndex::new(self.cp_len() - 1)
     }
 
     pub fn get_constant_index(&self, constant: &Constant) -> Option<ConstantPoolIndex> {
         if self.has_constant(constant) {
-            Some(ConstantPoolIndex::new(self.constants.iter().take_while(|item| **item != *constant).map(|item| item.cp_size()).fold(1, |acc, x| acc + x)))
+            Some(ConstantPoolIndex::new(
+                self.constants
+                    .iter()
+                    .take_while(|item| **item != *constant)
+                    .map(|item| item.cp_size())
+                    .fold(1, |acc, x| acc + x),
+            ))
         } else {
             None
         }
@@ -145,15 +158,13 @@ impl ConstantPool {
 
 impl Default for ConstantPool {
     fn default() -> Self {
-        ConstantPool {
-            constants: vec![]
-        }
+        ConstantPool { constants: vec![] }
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct ConstantPoolIndex {
-    pub idx: usize
+    pub idx: usize,
 }
 
 impl ConstantPoolIndex {
@@ -162,7 +173,7 @@ impl ConstantPoolIndex {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum Constant {
     Utf8(Vec<u8>),
     Integer(u32),
@@ -170,16 +181,101 @@ pub enum Constant {
     Long(u64),
     Double(u64),
     Class(ConstantPoolIndex),
-    FieldRef { class_index: ConstantPoolIndex, name_and_type_index: ConstantPoolIndex },
-    MethodRef { class_index: ConstantPoolIndex, name_and_type_index: ConstantPoolIndex },
-    InterfaceMethodRef { class_index: ConstantPoolIndex, name_and_type_index: ConstantPoolIndex },
+    FieldRef {
+        class_index: ConstantPoolIndex,
+        name_and_type_index: ConstantPoolIndex,
+    },
+    MethodRef {
+        class_index: ConstantPoolIndex,
+        name_and_type_index: ConstantPoolIndex,
+    },
+    InterfaceMethodRef {
+        class_index: ConstantPoolIndex,
+        name_and_type_index: ConstantPoolIndex,
+    },
     String(ConstantPoolIndex),
-    NameAndType { name_index: ConstantPoolIndex, descriptor_index: ConstantPoolIndex },
-    MethodHandle { reference_kind: ReferenceKind, reference_index: ConstantPoolIndex },
+    NameAndType {
+        name_index: ConstantPoolIndex,
+        descriptor_index: ConstantPoolIndex,
+    },
+    MethodHandle {
+        reference_kind: ReferenceKind,
+        reference_index: ConstantPoolIndex,
+    },
     MethodType(ConstantPoolIndex),
-    InvokeDynamic { bootstrap_method_attr_index: ConstantPoolIndex, name_and_type_index: ConstantPoolIndex },
+    InvokeDynamic {
+        bootstrap_method_attr_index: ConstantPoolIndex,
+        name_and_type_index: ConstantPoolIndex,
+    },
     Unknown(u8),
-    Placeholder
+    Placeholder,
+}
+
+impl Debug for Constant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Utf8(s) => {
+                write!(f, "{}", String::from_utf8(s.clone()).unwrap_or_default())
+            }
+            Self::Integer(arg0) => f.debug_tuple("Integer").field(arg0).finish(),
+            Self::Float(arg0) => f.debug_tuple("Float").field(arg0).finish(),
+            Self::Long(arg0) => f.debug_tuple("Long").field(arg0).finish(),
+            Self::Double(arg0) => f.debug_tuple("Double").field(arg0).finish(),
+            Self::Class(arg0) => f.debug_tuple("Class").field(arg0).finish(),
+            Self::FieldRef {
+                class_index,
+                name_and_type_index,
+            } => f
+                .debug_struct("FieldRef")
+                .field("class_index", class_index)
+                .field("name_and_type_index", name_and_type_index)
+                .finish(),
+            Self::MethodRef {
+                class_index,
+                name_and_type_index,
+            } => f
+                .debug_struct("MethodRef")
+                .field("class_index", class_index)
+                .field("name_and_type_index", name_and_type_index)
+                .finish(),
+            Self::InterfaceMethodRef {
+                class_index,
+                name_and_type_index,
+            } => f
+                .debug_struct("InterfaceMethodRef")
+                .field("class_index", class_index)
+                .field("name_and_type_index", name_and_type_index)
+                .finish(),
+            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::NameAndType {
+                name_index,
+                descriptor_index,
+            } => f
+                .debug_struct("NameAndType")
+                .field("name_index", name_index)
+                .field("descriptor_index", descriptor_index)
+                .finish(),
+            Self::MethodHandle {
+                reference_kind,
+                reference_index,
+            } => f
+                .debug_struct("MethodHandle")
+                .field("reference_kind", reference_kind)
+                .field("reference_index", reference_index)
+                .finish(),
+            Self::MethodType(arg0) => f.debug_tuple("MethodType").field(arg0).finish(),
+            Self::InvokeDynamic {
+                bootstrap_method_attr_index,
+                name_and_type_index,
+            } => f
+                .debug_struct("InvokeDynamic")
+                .field("bootstrap_method_attr_index", bootstrap_method_attr_index)
+                .field("name_and_type_index", name_and_type_index)
+                .finish(),
+            Self::Unknown(arg0) => f.debug_tuple("Unknown").field(arg0).finish(),
+            Self::Placeholder => write!(f, "Placeholder"),
+        }
+    }
 }
 
 impl Constant {
@@ -188,7 +284,7 @@ impl Constant {
             &Constant::Long(_) => 2,
             &Constant::Double(_) => 2,
             &Constant::Placeholder => 0,
-            _ => 1
+            _ => 1,
         }
     }
 }
@@ -204,7 +300,7 @@ pub enum ReferenceKind {
     InvokeSpecial = 7,
     NewInvokeSpecial = 8,
     InvokeInterface = 9,
-    Unknown = 255
+    Unknown = 255,
 }
 
 impl ReferenceKind {
@@ -219,7 +315,7 @@ impl ReferenceKind {
             7 => ReferenceKind::InvokeSpecial,
             8 => ReferenceKind::NewInvokeSpecial,
             9 => ReferenceKind::InvokeInterface,
-            _ => ReferenceKind::Unknown
+            _ => ReferenceKind::Unknown,
         }
     }
 
@@ -234,14 +330,14 @@ impl ReferenceKind {
             ReferenceKind::InvokeSpecial => 7,
             ReferenceKind::NewInvokeSpecial => 8,
             ReferenceKind::InvokeInterface => 9,
-            ReferenceKind::Unknown => 255
+            ReferenceKind::Unknown => 255,
         }
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct AccessFlags {
-    pub flags: u16
+    pub flags: u16,
 }
 
 impl AccessFlags {
@@ -267,60 +363,60 @@ impl AccessFlags {
 }
 
 pub enum ClassAccessFlags {
-    Public = 0x0001, // Declared public; may be accessed from outside its package.
-    Final = 0x0010, // Declared final; no subclasses allowed.
+    Public = 0x0001,     // Declared public; may be accessed from outside its package.
+    Final = 0x0010,      // Declared final; no subclasses allowed.
     Super = 0x0020, // Treat superclass methods specially when invoked by the invokespecial instruction.
     Interface = 0x0200, // Is an interface, not a class.
     Abstract = 0x0400, // Declared abstract; must not be instantiated.
     Synthetic = 0x1000, // Declared synthetic; not present in the source code.
     Annotation = 0x2000, // Declared as an annotation type.
-    Enum = 0x4000 // Declared as an enum type.
+    Enum = 0x4000,  // Declared as an enum type.
 }
 
 pub enum FieldAccessFlags {
-    Public = 0x0001, //	Declared public; may be accessed from outside its package.
-    Private = 0x0002, //	Declared private; usable only within the defining class.
+    Public = 0x0001,    //	Declared public; may be accessed from outside its package.
+    Private = 0x0002,   //	Declared private; usable only within the defining class.
     Protected = 0x0004, //	Declared protected; may be accessed within subclasses.
-    Static = 0x0008, //	Declared static.
+    Static = 0x0008,    //	Declared static.
     Final = 0x0010, //	Declared final; never directly assigned to after object construction (JLS §17.5).
     Volatile = 0x0040, //	Declared volatile; cannot be cached.
     Transient = 0x0080, //	Declared transient; not written or read by a persistent object manager.
     Synthetic = 0x1000, //	Declared synthetic; not present in the source code.
-    Enum = 0x4000 //	Declared as an element of an enum.
+    Enum = 0x4000,  //	Declared as an element of an enum.
 }
 
 pub enum MethodAccessFlags {
-    Public = 0x0001, //	Declared public; may be accessed from outside its package.
-    Private = 0x0002, //	Declared private; accessible only within the defining class.
-    Protected = 0x0004, //	Declared protected; may be accessed within subclasses.
-    Static = 0x0008, //	Declared static.
-    Final = 0x0010, //	Declared final; must not be overridden (§5.4.5).
+    Public = 0x0001,       //	Declared public; may be accessed from outside its package.
+    Private = 0x0002,      //	Declared private; accessible only within the defining class.
+    Protected = 0x0004,    //	Declared protected; may be accessed within subclasses.
+    Static = 0x0008,       //	Declared static.
+    Final = 0x0010,        //	Declared final; must not be overridden (§5.4.5).
     Synchronized = 0x0020, //	Declared synchronized; invocation is wrapped by a monitor use.
-    Bridge = 0x0040, //	A bridge method, generated by the compiler.
-    Varargs = 0x0080, //	Declared with variable number of arguments.
-    Native = 0x0100, //	Declared native; implemented in a language other than Java.
-    Abstract = 0x0400, //	Declared abstract; no implementation is provided.
-    Strict = 0x0800, //	Declared strictfp; floating-point mode is FP-strict.
-    Synthetic = 0x1000 //	Declared synthetic; not present in the source code.
+    Bridge = 0x0040,       //	A bridge method, generated by the compiler.
+    Varargs = 0x0080,      //	Declared with variable number of arguments.
+    Native = 0x0100,       //	Declared native; implemented in a language other than Java.
+    Abstract = 0x0400,     //	Declared abstract; no implementation is provided.
+    Strict = 0x0800,       //	Declared strictfp; floating-point mode is FP-strict.
+    Synthetic = 0x1000,    //	Declared synthetic; not present in the source code.
 }
 
 pub enum InnerClassAccessFlags {
-    Public = 0x0001, //	Marked or implicitly public in source.
-    Private = 0x0002, //	Marked private in source.
-    Protected = 0x0004, //	Marked protected in source.
-    Static = 0x0008, //	Marked or implicitly static in source.
-    Final = 0x0010, //	Marked final in source.
-    Interface = 0x0200, //	Was an interface in source.
-    Abstract = 0x0400, //	Marked or implicitly abstract in source.
-    Synthetic = 0x1000, //	Declared synthetic; not present in the source code.
+    Public = 0x0001,     //	Marked or implicitly public in source.
+    Private = 0x0002,    //	Marked private in source.
+    Protected = 0x0004,  //	Marked protected in source.
+    Static = 0x0008,     //	Marked or implicitly static in source.
+    Final = 0x0010,      //	Marked final in source.
+    Interface = 0x0200,  //	Was an interface in source.
+    Abstract = 0x0400,   //	Marked or implicitly abstract in source.
+    Synthetic = 0x1000,  //	Declared synthetic; not present in the source code.
     Annotation = 0x2000, //	Declared as an annotation type.
-    Enum = 0x4000, //	Declared as an enum type.
+    Enum = 0x4000,       //	Declared as an enum type.
 }
 
 pub enum ParameterAccessFlags {
     Final = 0x0010,
     Synthetic = 0x1000,
-    Mandated = 0x8000
+    Mandated = 0x8000,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -328,25 +424,34 @@ pub struct Field {
     pub access_flags: AccessFlags,
     pub name_index: ConstantPoolIndex,
     pub descriptor_index: ConstantPoolIndex,
-    pub attributes: Vec<Attribute>
+    pub attributes: Vec<Attribute>,
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct Method {
     pub access_flags: AccessFlags,
     pub name_index: ConstantPoolIndex,
     pub descriptor_index: ConstantPoolIndex,
-    pub attributes: Vec<Attribute>
+    pub attributes: Vec<Attribute>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     ConstantValue(ConstantPoolIndex),
-    Code { max_stack: u16, max_locals: u16, code: Vec<Instruction>, exception_table: Vec<ExceptionHandler>, attributes: Vec<Attribute> },
+    Code {
+        max_stack: u16,
+        max_locals: u16,
+        code: Vec<Instruction>,
+        exception_table: Vec<ExceptionHandler>,
+        attributes: Vec<Attribute>,
+    },
     StackMapTable(Vec<StackMapFrame>),
     Exceptions(Vec<ConstantPoolIndex>),
     InnerClasses(Vec<InnerClass>),
-    EnclosingMethod { class_index: ConstantPoolIndex, method_index: ConstantPoolIndex },
+    EnclosingMethod {
+        class_index: ConstantPoolIndex,
+        method_index: ConstantPoolIndex,
+    },
     Synthetic,
     Signature(ConstantPoolIndex),
     SourceFile(ConstantPoolIndex),
@@ -364,37 +469,80 @@ pub enum Attribute {
     AnnotationDefault(ElementValue),
     BootstrapMethods(Vec<BootstrapMethod>),
     MethodParameters(Vec<MethodParameter>),
-    RawAttribute { name_index: ConstantPoolIndex, info: Vec<u8> }
+    RawAttribute {
+        name_index: ConstantPoolIndex,
+        info: Vec<u8>,
+    },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StackMapFrame {
-    SameFrame { tag: u8 },
-    SameLocals1StackItemFrame { tag: u8, stack: VerificationType },
-    SameLocals1StackItemFrameExtended { offset_delta: u16, stack: VerificationType },
-    ChopFrame { tag: u8, offset_delta: u16 },
-    SameFrameExtended { offset_delta: u16 },
-    AppendFrame { tag: u8, offset_delta: u16, locals: Vec<VerificationType> },
-    FullFrame { offset_delta: u16, locals: Vec<VerificationType>, stack: Vec<VerificationType> },
-    FutureUse { tag: u8 }
+    SameFrame {
+        tag: u8,
+    },
+    SameLocals1StackItemFrame {
+        tag: u8,
+        stack: VerificationType,
+    },
+    SameLocals1StackItemFrameExtended {
+        offset_delta: u16,
+        stack: VerificationType,
+    },
+    ChopFrame {
+        tag: u8,
+        offset_delta: u16,
+    },
+    SameFrameExtended {
+        offset_delta: u16,
+    },
+    AppendFrame {
+        tag: u8,
+        offset_delta: u16,
+        locals: Vec<VerificationType>,
+    },
+    FullFrame {
+        offset_delta: u16,
+        locals: Vec<VerificationType>,
+        stack: Vec<VerificationType>,
+    },
+    FutureUse {
+        tag: u8,
+    },
 }
 
 impl StackMapFrame {
     pub fn len(&self) -> usize {
         match self {
             &StackMapFrame::SameFrame { tag: _ } => 1,
-            &StackMapFrame::SameLocals1StackItemFrame{ tag: _, ref stack } => 1 + stack.len(),
-            &StackMapFrame::SameLocals1StackItemFrameExtended { offset_delta: _, ref stack } => 3 + stack.len(),
-            &StackMapFrame::ChopFrame { tag: _, offset_delta: _ } => 3,
+            &StackMapFrame::SameLocals1StackItemFrame { tag: _, ref stack } => 1 + stack.len(),
+            &StackMapFrame::SameLocals1StackItemFrameExtended {
+                offset_delta: _,
+                ref stack,
+            } => 3 + stack.len(),
+            &StackMapFrame::ChopFrame {
+                tag: _,
+                offset_delta: _,
+            } => 3,
             &StackMapFrame::SameFrameExtended { offset_delta: _ } => 3,
-            &StackMapFrame::AppendFrame { tag: _, offset_delta: _, ref locals } => 3 + locals.iter().fold(0, |acc, x| acc + x.len()),
-            &StackMapFrame::FullFrame { offset_delta: _, ref locals, ref stack } => 7 + locals.iter().fold(0, |acc, x| acc + x.len()) + stack.iter().fold(0, |acc, x| acc + x.len()),
-            &StackMapFrame::FutureUse { tag: _ } => 0
+            &StackMapFrame::AppendFrame {
+                tag: _,
+                offset_delta: _,
+                ref locals,
+            } => 3 + locals.iter().fold(0, |acc, x| acc + x.len()),
+            &StackMapFrame::FullFrame {
+                offset_delta: _,
+                ref locals,
+                ref stack,
+            } => {
+                7 + locals.iter().fold(0, |acc, x| acc + x.len())
+                    + stack.iter().fold(0, |acc, x| acc + x.len())
+            }
+            &StackMapFrame::FutureUse { tag: _ } => 0,
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VerificationType {
     Top,
     Integer,
@@ -404,7 +552,7 @@ pub enum VerificationType {
     Null,
     UninitializedThis,
     Object { cpool_index: ConstantPoolIndex },
-    Uninitialized { offset: u16 }
+    Uninitialized { offset: u16 },
 }
 
 impl VerificationType {
@@ -412,68 +560,71 @@ impl VerificationType {
         match self {
             &VerificationType::Object { cpool_index: _ } => 3,
             &VerificationType::Uninitialized { offset: _ } => 3,
-            _ => 1
+            _ => 1,
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExceptionHandler {
     pub start_pc: u16,
     pub end_pc: u16,
     pub handler_pc: u16,
-    pub catch_type: ConstantPoolIndex
+    pub catch_type: ConstantPoolIndex,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InnerClass {
     pub inner_class_info_index: ConstantPoolIndex,
     pub outer_class_info_index: ConstantPoolIndex,
     pub inner_name_index: ConstantPoolIndex,
-    pub access_flags: AccessFlags
+    pub access_flags: AccessFlags,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LineNumberTable {
     pub start_pc: u16,
-    pub line_number: u16
+    pub line_number: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LocalVariableTable {
     pub start_pc: u16,
     pub length: u16,
     pub name_index: ConstantPoolIndex,
     pub descriptor_index: ConstantPoolIndex,
-    pub index: u16
+    pub index: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LocalVariableTypeTable {
     pub start_pc: u16,
     pub length: u16,
     pub name_index: ConstantPoolIndex,
     pub signature_index: ConstantPoolIndex,
-    pub index: u16
+    pub index: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Annotation {
     pub type_index: ConstantPoolIndex,
-    pub element_value_pairs: Vec<ElementValuePair>
+    pub element_value_pairs: Vec<ElementValuePair>,
 }
 
 impl Annotation {
     pub fn len(&self) -> usize {
-        4 + self.element_value_pairs.iter().fold(0, |acc, x| acc + x.len())
+        4 + self
+            .element_value_pairs
+            .iter()
+            .fold(0, |acc, x| acc + x.len())
         //4 + self.element_value_pairs.len() * 2 + self.element_value_pairs.iter().fold(0, |acc, x| acc + x.len())
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ElementValuePair {
     pub element_name_index: ConstantPoolIndex,
-    pub value: ElementValue
+    pub value: ElementValue,
 }
 
 impl ElementValuePair {
@@ -482,53 +633,91 @@ impl ElementValuePair {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ElementValue {
     ConstantValue(u8, ConstantPoolIndex),
-    Enum { type_name_index: ConstantPoolIndex, const_name_index: ConstantPoolIndex },
+    Enum {
+        type_name_index: ConstantPoolIndex,
+        const_name_index: ConstantPoolIndex,
+    },
     ClassInfo(ConstantPoolIndex),
     Annotation(Annotation),
-    Array(Vec<ElementValue>)
+    Array(Vec<ElementValue>),
 }
 
 impl ElementValue {
     pub fn len(&self) -> usize {
         match self {
             &ElementValue::ConstantValue(_, _) => 3,
-            &ElementValue::Enum { type_name_index: _, const_name_index: _ } => 5,
+            &ElementValue::Enum {
+                type_name_index: _,
+                const_name_index: _,
+            } => 5,
             &ElementValue::ClassInfo(_) => 3,
             &ElementValue::Annotation(ref annotation) => 1 + annotation.len(),
-            &ElementValue::Array(ref table) => table.iter().fold(3, |acc, x| acc + x.len())
+            &ElementValue::Array(ref table) => table.iter().fold(3, |acc, x| acc + x.len()),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypeAnnotation {
     pub target_info: TargetInfo,
     pub target_path: TypePath,
     pub type_index: ConstantPoolIndex,
-    pub element_value_pairs: Vec<ElementValuePair>
+    pub element_value_pairs: Vec<ElementValuePair>,
 }
 
 impl TypeAnnotation {
     pub fn len(&self) -> usize {
-        5 + self.target_info.len() + self.target_path.len() + self.element_value_pairs.iter().fold(0, |acc, x| acc + x.len())
+        5 + self.target_info.len()
+            + self.target_path.len()
+            + self
+                .element_value_pairs
+                .iter()
+                .fold(0, |acc, x| acc + x.len())
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TargetInfo {
-    TypeParameter { subtype: u8, idx: u8 },
-    SuperType { idx: u16 },
-    TypeParameterBound { subtype: u8, param_idx: u8, bound_index: u8 },
-    Empty { subtype: u8 },
-    MethodFormalParameter { idx: u8 },
-    Throws { idx: u16 },
-    LocalVar { subtype: u8, target: Vec<(u16, u16, u16)> },
-    Catch { idx: u16 },
-    Offset { subtype: u8, idx: u16 },
-    TypeArgument { subtype: u8, offset: u16, type_arg_idx: u8 }
+    TypeParameter {
+        subtype: u8,
+        idx: u8,
+    },
+    SuperType {
+        idx: u16,
+    },
+    TypeParameterBound {
+        subtype: u8,
+        param_idx: u8,
+        bound_index: u8,
+    },
+    Empty {
+        subtype: u8,
+    },
+    MethodFormalParameter {
+        idx: u8,
+    },
+    Throws {
+        idx: u16,
+    },
+    LocalVar {
+        subtype: u8,
+        target: Vec<(u16, u16, u16)>,
+    },
+    Catch {
+        idx: u16,
+    },
+    Offset {
+        subtype: u8,
+        idx: u16,
+    },
+    TypeArgument {
+        subtype: u8,
+        offset: u16,
+        type_arg_idx: u8,
+    },
 }
 
 impl TargetInfo {
@@ -536,14 +725,25 @@ impl TargetInfo {
         match self {
             &TargetInfo::TypeParameter { subtype: _, idx: _ } => 1,
             &TargetInfo::SuperType { idx: _ } => 2,
-            &TargetInfo::TypeParameterBound { subtype: _, param_idx: _, bound_index: _ } => 2,
+            &TargetInfo::TypeParameterBound {
+                subtype: _,
+                param_idx: _,
+                bound_index: _,
+            } => 2,
             &TargetInfo::Empty { subtype: _ } => 0,
             &TargetInfo::MethodFormalParameter { idx: _ } => 1,
             &TargetInfo::Throws { idx: _ } => 2,
-            &TargetInfo::LocalVar { subtype: _, ref target } => { 2 + target.len() * 6 },
+            &TargetInfo::LocalVar {
+                subtype: _,
+                ref target,
+            } => 2 + target.len() * 6,
             &TargetInfo::Catch { idx: _ } => 2,
             &TargetInfo::Offset { subtype: _, idx: _ } => 2,
-            &TargetInfo::TypeArgument { subtype: _, offset: _, type_arg_idx: _ } => 3
+            &TargetInfo::TypeArgument {
+                subtype: _,
+                offset: _,
+                type_arg_idx: _,
+            } => 3,
         }
     }
 
@@ -551,21 +751,29 @@ impl TargetInfo {
         match self {
             &TargetInfo::TypeParameter { subtype, idx: _ } => subtype,
             &TargetInfo::SuperType { idx: _ } => 0x10,
-            &TargetInfo::TypeParameterBound { subtype, param_idx: _, bound_index: _ } => subtype,
+            &TargetInfo::TypeParameterBound {
+                subtype,
+                param_idx: _,
+                bound_index: _,
+            } => subtype,
             &TargetInfo::Empty { subtype } => subtype,
             &TargetInfo::MethodFormalParameter { idx: _ } => 0x16,
             &TargetInfo::Throws { idx: _ } => 0x17,
             &TargetInfo::LocalVar { subtype, target: _ } => subtype,
             &TargetInfo::Catch { idx: _ } => 0x42,
             &TargetInfo::Offset { subtype, idx: _ } => subtype,
-            &TargetInfo::TypeArgument { subtype, offset: _, type_arg_idx: _ } => subtype
+            &TargetInfo::TypeArgument {
+                subtype,
+                offset: _,
+                type_arg_idx: _,
+            } => subtype,
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypePath {
-    pub path: Vec<(TypePathKind, u8)>
+    pub path: Vec<(TypePathKind, u8)>,
 }
 
 impl TypePath {
@@ -574,12 +782,12 @@ impl TypePath {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypePathKind {
-    Array, // Annotation is deeper in an array type
-    Nested, // Annotation is deeper in a nested type
-    Wildcard, // Annotation is on the bound of a wildcard type argument of a parameterized type
-    TypeArgument // Annotation is on a type argument of a parameterized type
+    Array,        // Annotation is deeper in an array type
+    Nested,       // Annotation is deeper in a nested type
+    Wildcard,     // Annotation is on the bound of a wildcard type argument of a parameterized type
+    TypeArgument, // Annotation is on a type argument of a parameterized type
 }
 
 impl TypePathKind {
@@ -593,27 +801,28 @@ impl TypePathKind {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BootstrapMethod {
     pub bootstrap_method_ref: ConstantPoolIndex,
-    pub bootstrap_arguments: Vec<ConstantPoolIndex>
+    pub bootstrap_arguments: Vec<ConstantPoolIndex>,
 }
 
-impl BootstrapMethod {
-}
+impl BootstrapMethod {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MethodParameter {
     pub name_index: ConstantPoolIndex,
-    pub access_flags: AccessFlags
+    pub access_flags: AccessFlags,
 }
 
 impl MethodParameter {
-    pub fn len(&self) -> usize { 4 }
+    pub fn len(&self) -> usize {
+        4
+    }
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     AALOAD,
     AASTORE,
@@ -879,7 +1088,7 @@ impl Instruction {
             &Instruction::LDC_W(_) => 3,
             &Instruction::LDC2_W(_) => 3,
             &Instruction::LLOAD(_) => 2,
-            &Instruction::LOOKUPSWITCH(_, ref pairs) => { 5 + pairs.len() * 4 },
+            &Instruction::LOOKUPSWITCH(_, ref pairs) => 5 + pairs.len() * 4,
             &Instruction::LSTORE(_) => 2,
             &Instruction::MULTIANEWARRAY(_, _) => 4,
             &Instruction::NEW(_) => 3,
@@ -888,7 +1097,7 @@ impl Instruction {
             &Instruction::PUTSTATIC(_) => 3,
             &Instruction::RET(_) => 2,
             &Instruction::SIPUSH(_) => 3,
-            &Instruction::TABLESWITCH(_, _, _, ref indices) => { 13 + (indices.len() * 4) },
+            &Instruction::TABLESWITCH(_, _, _, ref indices) => 13 + (indices.len() * 4),
             &Instruction::IINC_W(_, _) => 9,
             &Instruction::ILOAD_W(_) => 5,
             &Instruction::FLOAD_W(_) => 5,
@@ -902,7 +1111,7 @@ impl Instruction {
             &Instruction::DSTORE_W(_) => 5,
             &Instruction::RET_W(_) => 5,
             &Instruction::PADDED_INSTRUCTION(padding) => padding,
-            _ => 1
+            _ => 1,
         }
     }
 }

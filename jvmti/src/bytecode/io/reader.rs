@@ -1,13 +1,14 @@
-use std::io::{ Cursor, Read, Error, ErrorKind };
-use std::cell::Cell;
 use super::super::classfile::*;
+use std::cell::Cell;
+use std::io::{Cursor, Error, ErrorKind, Read};
 
-pub struct ClassReader {
-}
+pub struct ClassReader {}
 
 impl ClassReader {
-
-    pub fn read_class<T>(source: &mut T) -> Result<Classfile, Error> where T: Read {
+    pub fn read_class<T>(source: &mut T) -> Result<Classfile, Error>
+    where
+        T: Read,
+    {
         let mut reader = BlockReader::new(source);
 
         let fns: Vec<fn(&mut BlockReader, &ClassFragment) -> Result<ClassFragment, Error>> = vec![
@@ -20,48 +21,58 @@ impl ClassReader {
             ClassReader::read_interfaces,
             ClassReader::read_fields,
             ClassReader::read_methods,
-            ClassReader::read_class_attributes
+            ClassReader::read_class_attributes,
         ];
 
-        let result = fns.iter().fold(Ok(ClassFragment::default()), |acc, x| {
-            match acc {
+        let result = fns
+            .iter()
+            .fold(Ok(ClassFragment::default()), |acc, x| match acc {
                 Ok(acc_fragment) => match x(&mut reader, &acc_fragment) {
                     Ok(cur_fragment) => Ok(acc_fragment.merge(cur_fragment)),
-                    err@_ => err
+                    err @ _ => err,
                 },
-                err@_ => err
-            }
-        });
+                err @ _ => err,
+            });
 
         match result {
             Ok(fragment) => Ok(fragment.to_class()),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_magic_bytes(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_magic_bytes(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match reader.read_u32() {
             Ok(0xCAFEBABE) => Ok(ClassFragment::default()),
-            _ => Err(Error::new(ErrorKind::InvalidData, "Invalid magic bytes"))
+            _ => Err(Error::new(ErrorKind::InvalidData, "Invalid magic bytes")),
         }
     }
 
-    fn read_classfile_version(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_classfile_version(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match (reader.read_u16(), reader.read_u16()) {
-            (Ok(minor_version), Ok(major_version)) => {
-                Ok(ClassFragment {
-                    version: Some(ClassfileVersion::new(major_version, minor_version)),
-                    ..Default::default()
-                })
-            },
-            _ => Err(Error::new(ErrorKind::UnexpectedEof, "Could not read classfile version number"))
+            (Ok(minor_version), Ok(major_version)) => Ok(ClassFragment {
+                version: Some(ClassfileVersion::new(major_version, minor_version)),
+                ..Default::default()
+            }),
+            _ => Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "Could not read classfile version number",
+            )),
         }
     }
 
-    fn read_constant_pool(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_constant_pool(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match reader.read_u16() {
             Ok(cp_len) => {
-                let mut constants: Vec<Constant> = vec![ Constant::Placeholder ];
+                let mut constants: Vec<Constant> = vec![Constant::Placeholder];
 
                 for _ in 1..cp_len {
                     if constants.len() < cp_len as usize {
@@ -74,8 +85,8 @@ impl ClassReader {
                                 for _ in 1..constant_size {
                                     constants.push(Constant::Placeholder);
                                 }
-                            },
-                            Err(err) => return Err(err)
+                            }
+                            Err(err) => return Err(err),
                         }
                     }
                 }
@@ -84,8 +95,8 @@ impl ClassReader {
                     constant_pool: Some(ConstantPool::new(constants)),
                     ..Default::default()
                 })
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -95,97 +106,110 @@ impl ClassReader {
         match tag {
             Ok(1) => match reader.read_u16() {
                 Ok(str_len) => match reader.read_n(str_len as usize) {
-                    Ok(bytes) => {
-                        Ok(Constant::Utf8(bytes))
-                    },
-                    Err(err) => Err(err)
+                    Ok(bytes) => Ok(Constant::Utf8(bytes)),
+                    Err(err) => Err(err),
                 },
-                Err(err) => Err(err)
+                Err(err) => Err(err),
             },
             Ok(3) => reader.read_u32().map(|value| Constant::Integer(value)),
             Ok(4) => reader.read_u32().map(|value| Constant::Float(value)),
             Ok(5) => reader.read_u64().map(|value| Constant::Long(value)),
             Ok(6) => reader.read_u64().map(|value| Constant::Double(value)),
-            Ok(7) => reader.read_u16().map(|idx| Constant::Class(ConstantPoolIndex::new(idx as usize))),
-            Ok(8) => reader.read_u16().map(|idx| Constant::String(ConstantPoolIndex::new(idx as usize))),
+            Ok(7) => reader
+                .read_u16()
+                .map(|idx| Constant::Class(ConstantPoolIndex::new(idx as usize))),
+            Ok(8) => reader
+                .read_u16()
+                .map(|idx| Constant::String(ConstantPoolIndex::new(idx as usize))),
             Ok(9) => ClassReader::require_n(reader, 4, |mut r| Constant::FieldRef {
                 class_index: ConstantPoolIndex::new(r.get_u16() as usize),
-                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
             Ok(10) => ClassReader::require_n(reader, 4, |mut r| Constant::MethodRef {
                 class_index: ConstantPoolIndex::new(r.get_u16() as usize),
-                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
             Ok(11) => ClassReader::require_n(reader, 4, |mut r| Constant::InterfaceMethodRef {
                 class_index: ConstantPoolIndex::new(r.get_u16() as usize),
-                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
             Ok(12) => ClassReader::require_n(reader, 4, |mut r| Constant::NameAndType {
-                    name_index: ConstantPoolIndex::new(r.get_u16() as usize),
-                    descriptor_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                name_index: ConstantPoolIndex::new(r.get_u16() as usize),
+                descriptor_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
             Ok(15) => ClassReader::require_n(reader, 3, |mut r| Constant::MethodHandle {
                 reference_kind: ReferenceKind::from_u8(r.get_u8()),
-                reference_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                reference_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
-            Ok(16) => reader.read_u16().map(|idx| Constant::MethodType(ConstantPoolIndex::new(idx as usize))),
+            Ok(16) => reader
+                .read_u16()
+                .map(|idx| Constant::MethodType(ConstantPoolIndex::new(idx as usize))),
             Ok(18) => ClassReader::require_n(reader, 4, |mut r| Constant::InvokeDynamic {
                 bootstrap_method_attr_index: ConstantPoolIndex::new(r.get_u16() as usize),
-                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize)
+                name_and_type_index: ConstantPoolIndex::new(r.get_u16() as usize),
             }),
             Ok(tag) => Ok(Constant::Unknown(tag)),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_access_flags(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_access_flags(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match reader.read_u16() {
             Ok(val) => Ok(ClassFragment {
                 access_flags: Some(AccessFlags::of(val)),
                 ..Default::default()
             }),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_this_class(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_this_class(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match ClassReader::read_constant_pool_index(reader) {
             Ok(idx) => Ok(ClassFragment {
                 this_class: Some(idx),
                 ..Default::default()
             }),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_super_class(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_super_class(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match ClassReader::read_constant_pool_index(reader) {
             Ok(idx) => Ok(ClassFragment {
                 super_class: Some(idx),
                 ..Default::default()
             }),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_interfaces(reader: &mut BlockReader, _: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_interfaces(
+        reader: &mut BlockReader,
+        _: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match reader.read_u16() {
-            Ok(ifs_len) => {
-                (0..ifs_len).fold(Ok(vec![]), |acc, _| {
-                    match acc {
-                        Ok(mut ifs) => match ClassReader::read_constant_pool_index(reader) {
-                            Ok(interface) => {
-                                ifs.push(interface);
-                                Ok(ifs)
-                            },
-                            Err(err) => Err(err)
-                        },
-                        err@_ => err
+            Ok(ifs_len) => (0..ifs_len).fold(Ok(vec![]), |acc, _| match acc {
+                Ok(mut ifs) => match ClassReader::read_constant_pool_index(reader) {
+                    Ok(interface) => {
+                        ifs.push(interface);
+                        Ok(ifs)
                     }
-                })
-            },
-            Err(err) => Err(err)
-        }.map(|ifs| ClassFragment {
+                    Err(err) => Err(err),
+                },
+                err @ _ => err,
+            }),
+            Err(err) => Err(err),
+        }
+        .map(|ifs| ClassFragment {
             interfaces: Some(ifs),
             ..Default::default()
         })
@@ -193,105 +217,103 @@ impl ClassReader {
 
     fn read_fields(reader: &mut BlockReader, cf: &ClassFragment) -> Result<ClassFragment, Error> {
         match reader.read_u16() {
-            Ok(fields_len) => {
-                (0..fields_len).fold(Ok(vec![]), |acc, _| {
-                    match acc {
-                        Ok(mut fields) => match ClassReader::read_field(reader, cf) {
-                            Ok(field) => {
-                                fields.push(field);
-                                Ok(fields)
-                            },
-                            Err(err) => Err(err)
-                        },
-                        err@_ => err
+            Ok(fields_len) => (0..fields_len).fold(Ok(vec![]), |acc, _| match acc {
+                Ok(mut fields) => match ClassReader::read_field(reader, cf) {
+                    Ok(field) => {
+                        fields.push(field);
+                        Ok(fields)
                     }
-                })
-            },
-            Err(err) => Err(err)
-        }.map(|fields| ClassFragment {
+                    Err(err) => Err(err),
+                },
+                err @ _ => err,
+            }),
+            Err(err) => Err(err),
+        }
+        .map(|fields| ClassFragment {
             fields: Some(fields),
             ..Default::default()
         })
     }
 
     fn read_field(reader: &mut BlockReader, cf: &ClassFragment) -> Result<Field, Error> {
-        match ClassReader::require_n(reader, 6, |mut r| { (r.get_u16(), r.get_u16(), r.get_u16()) }) {
+        match ClassReader::require_n(reader, 6, |mut r| (r.get_u16(), r.get_u16(), r.get_u16())) {
             Ok((flags, n_idx, d_idx)) => match ClassReader::read_attributes(reader, cf) {
                 Ok(attributes) => Ok(Field {
                     access_flags: AccessFlags::of(flags),
                     name_index: ConstantPoolIndex::new(n_idx as usize),
                     descriptor_index: ConstantPoolIndex::new(d_idx as usize),
-                    attributes: attributes
+                    attributes: attributes,
                 }),
-                Err(err) => Err(err)
+                Err(err) => Err(err),
             },
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
     fn read_methods(reader: &mut BlockReader, cf: &ClassFragment) -> Result<ClassFragment, Error> {
         match reader.read_u16() {
-            Ok(methods_len) => {
-                (0..methods_len).fold(Ok(vec![]), |acc, _| {
-                    match acc {
-                        Ok(mut methods) => match ClassReader::read_method(reader, cf) {
-                            Ok(method) => {
-                                methods.push(method);
-                                Ok(methods)
-                            },
-                            Err(err) => Err(err)
-                        },
-                        err@_ => err
+            Ok(methods_len) => (0..methods_len).fold(Ok(vec![]), |acc, _| match acc {
+                Ok(mut methods) => match ClassReader::read_method(reader, cf) {
+                    Ok(method) => {
+                        methods.push(method);
+                        Ok(methods)
                     }
-                })
-            },
-            Err(err) => Err(err)
-        }.map(|methods| ClassFragment {
+                    Err(err) => Err(err),
+                },
+                err @ _ => err,
+            }),
+            Err(err) => Err(err),
+        }
+        .map(|methods| ClassFragment {
             methods: Some(methods),
             ..Default::default()
         })
     }
 
     fn read_method(reader: &mut BlockReader, cf: &ClassFragment) -> Result<Method, Error> {
-        match ClassReader::require_n(reader, 6, |mut r| { (r.get_u16(), r.get_u16(), r.get_u16()) }) {
+        match ClassReader::require_n(reader, 6, |mut r| (r.get_u16(), r.get_u16(), r.get_u16())) {
             Ok((flags, n_idx, d_idx)) => match ClassReader::read_attributes(reader, cf) {
                 Ok(attributes) => Ok(Method {
                     access_flags: AccessFlags::of(flags),
                     name_index: ConstantPoolIndex::new(n_idx as usize),
                     descriptor_index: ConstantPoolIndex::new(d_idx as usize),
-                    attributes: attributes
+                    attributes: attributes,
                 }),
-                Err(err) => Err(err)
+                Err(err) => Err(err),
             },
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_class_attributes(reader: &mut BlockReader, cf: &ClassFragment) -> Result<ClassFragment, Error> {
+    fn read_class_attributes(
+        reader: &mut BlockReader,
+        cf: &ClassFragment,
+    ) -> Result<ClassFragment, Error> {
         match ClassReader::read_attributes(reader, cf) {
             Ok(attributes) => Ok(ClassFragment {
                 attributes: Some(attributes),
                 ..Default::default()
             }),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn read_attributes(reader: &mut BlockReader, cf: &ClassFragment) -> Result<Vec<Attribute>, Error> {
+    fn read_attributes(
+        reader: &mut BlockReader,
+        cf: &ClassFragment,
+    ) -> Result<Vec<Attribute>, Error> {
         match reader.read_u16() {
-            Ok(attr_len) => (0..attr_len).fold(Ok(vec![]), |acc, _| {
-                match acc {
-                    Ok(mut attributes) => match ClassReader::read_attribute(reader, cf) {
-                        Ok(attribute) => {
-                            attributes.push(attribute);
-                            Ok(attributes)
-                        },
-                        Err(err) => Err(err)
-                    },
-                    err@_ => err
-                }
+            Ok(attr_len) => (0..attr_len).fold(Ok(vec![]), |acc, _| match acc {
+                Ok(mut attributes) => match ClassReader::read_attribute(reader, cf) {
+                    Ok(attribute) => {
+                        attributes.push(attribute);
+                        Ok(attributes)
+                    }
+                    Err(err) => Err(err),
+                },
+                err @ _ => err,
             }),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
@@ -299,12 +321,16 @@ impl ClassReader {
         match reader.read_u16() {
             Ok(n_idx) => match reader.read_u32() {
                 Ok(a_len) => match reader.read_n(a_len as usize) {
-                    Ok(mut bytes) => Ok(ClassReader::parse_attribute(n_idx, BlockReader::new(&mut Cursor::new(&mut bytes)), cf)),
-                    Err(err) => Err(err)
+                    Ok(mut bytes) => Ok(ClassReader::parse_attribute(
+                        n_idx,
+                        BlockReader::new(&mut Cursor::new(&mut bytes)),
+                        cf,
+                    )),
+                    Err(err) => Err(err),
                 },
-                Err(err) => Err(err)
+                Err(err) => Err(err),
             },
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
@@ -320,12 +346,15 @@ impl ClassReader {
         }).collect()*/
         let read_bytes: Cell<usize> = Cell::new(0);
 
-        (0..len).take_while(|_| read_bytes.get() < len).map(|_| {
-            let instruction = ClassReader::parse_instruction(reader, read_bytes.get());
+        (0..len)
+            .take_while(|_| read_bytes.get() < len)
+            .map(|_| {
+                let instruction = ClassReader::parse_instruction(reader, read_bytes.get());
 
-            read_bytes.set(reader.position());
-            instruction
-        }).collect()
+                read_bytes.set(reader.position());
+                instruction
+            })
+            .collect()
     }
 
     fn parse_instruction(reader: &mut BlockReader, current_offset: usize) -> Instruction {
@@ -461,8 +490,20 @@ impl ClassReader {
             0x68 => Instruction::IMUL,
             0x74 => Instruction::INEG,
             0xc1 => Instruction::INSTANCEOF(reader.get_u16()),
-            0xba => (Instruction::INVOKEDYNAMIC(reader.get_u16()), reader.get_u16()).0,
-            0xb9 => (Instruction::INVOKEINTERFACE(reader.get_u16(), reader.get_u8()), reader.get_u8()).0,
+            0xba => {
+                (
+                    Instruction::INVOKEDYNAMIC(reader.get_u16()),
+                    reader.get_u16(),
+                )
+                    .0
+            }
+            0xb9 => {
+                (
+                    Instruction::INVOKEINTERFACE(reader.get_u16(), reader.get_u8()),
+                    reader.get_u8(),
+                )
+                    .0
+            }
             0xb7 => Instruction::INVOKESPECIAL(reader.get_u16()),
             0xb8 => Instruction::INVOKESTATIC(reader.get_u16()),
             0xb6 => Instruction::INVOKEVIRTUAL(reader.get_u16()),
@@ -505,13 +546,15 @@ impl ClassReader {
             0xab => {
                 let padding = (4 - ((current_offset + 1) % 4)) % 4;
                 let _ = reader.get_n(padding);
-                let default =  reader.get_u32() as i32;
+                let default = reader.get_u32() as i32;
                 let n = reader.get_u32();
 
                 Instruction::LOOKUPSWITCH(default, {
-                    (0..n).map(|_| (reader.get_u32() as i32, reader.get_u32() as i32)).collect()
+                    (0..n)
+                        .map(|_| (reader.get_u32() as i32, reader.get_u32() as i32))
+                        .collect()
                 })
-            },
+            }
             0x81 => Instruction::LOR,
             0x71 => Instruction::LREM,
             0xad => Instruction::LRETURN,
@@ -549,8 +592,15 @@ impl ClassReader {
                 let low = reader.get_u32() as i32;
                 let high = reader.get_u32() as i32;
 
-                Instruction::TABLESWITCH(default, low, high, (0..high - low + 1).map(|_| reader.get_u32() as i32).collect())
-            },
+                Instruction::TABLESWITCH(
+                    default,
+                    low,
+                    high,
+                    (0..high - low + 1)
+                        .map(|_| reader.get_u32() as i32)
+                        .collect(),
+                )
+            }
             0xc4 => {
                 let opcode = reader.get_u8();
                 let index = reader.get_u16();
@@ -570,13 +620,12 @@ impl ClassReader {
                     0x84 => {
                         let constbyte = reader.get_u16();
                         Instruction::IINC_W(index, constbyte as i16)
-                    },
+                    }
                     // This should not be happening
-                    _ => Instruction::WTF(opcode as u32)
-
+                    _ => Instruction::WTF(opcode as u32),
                 }
-            },
-            _ => Instruction::WTF(opcode as u32)
+            }
+            _ => Instruction::WTF(opcode as u32),
         };
 
         instruction
@@ -741,11 +790,13 @@ impl ClassReader {
             type_index: ConstantPoolIndex::new(reader.get_u16() as usize),
             element_value_pairs: {
                 let en = reader.get_u16();
-                (0..en).map(|_| ElementValuePair {
-                    element_name_index: ConstantPoolIndex::new(reader.get_u16() as usize),
-                    value: ClassReader::read_element_value(reader)
-                }).collect()
-            }
+                (0..en)
+                    .map(|_| ElementValuePair {
+                        element_name_index: ConstantPoolIndex::new(reader.get_u16() as usize),
+                        value: ClassReader::read_element_value(reader),
+                    })
+                    .collect()
+            },
         }
     }
 
@@ -754,64 +805,100 @@ impl ClassReader {
             target_info: match reader.get_u8() {
                 // 0x00 type parameter declaration of generic class or interface
                 // 0x01 type parameter declaration of generic method or constructor
-                subtype @ 0x00...0x01 => TargetInfo::TypeParameter { subtype: subtype, idx: reader.get_u8() },
+                subtype @ 0x00...0x01 => TargetInfo::TypeParameter {
+                    subtype: subtype,
+                    idx: reader.get_u8(),
+                },
                 // type in extends or implements clause of class declaration (including the direct superclass or direct superinterface of an anonymous class declaration), or in extends clause of interface declaration
-                0x10 => TargetInfo::SuperType { idx: reader.get_u16() },
+                0x10 => TargetInfo::SuperType {
+                    idx: reader.get_u16(),
+                },
                 // 0x11 type in bound of type parameter declaration of generic class or interface
                 // 0x12 type in bound of type parameter declaration of generic method or constructor
-                subtype @ 0x11...0x12 => TargetInfo::TypeParameterBound { subtype: subtype, param_idx: reader.get_u8(), bound_index: reader.get_u8() },
+                subtype @ 0x11...0x12 => TargetInfo::TypeParameterBound {
+                    subtype: subtype,
+                    param_idx: reader.get_u8(),
+                    bound_index: reader.get_u8(),
+                },
                 // 0x13 type in field declaration
                 // 0x14 return type of method, or type of newly constructed object
                 // 0x15 receiver type of method or constructor
                 subtype @ 0x13...0x15 => TargetInfo::Empty { subtype: subtype },
                 // type in formal parameter declaration of method, constructor, or lambda expression
-                0x16 => TargetInfo::MethodFormalParameter { idx: reader.get_u8() },
+                0x16 => TargetInfo::MethodFormalParameter {
+                    idx: reader.get_u8(),
+                },
                 // type in throws clause of method or constructor
-                0x17 => TargetInfo::Throws { idx: reader.get_u16() },
+                0x17 => TargetInfo::Throws {
+                    idx: reader.get_u16(),
+                },
                 // 0x40 type in local variable declaration
                 // 0x41 type in resource variable declaration
-                subtype @ 0x40...0x41 => TargetInfo::LocalVar { subtype: subtype, target: {
-                    let count = reader.get_u16();
+                subtype @ 0x40...0x41 => TargetInfo::LocalVar {
+                    subtype: subtype,
+                    target: {
+                        let count = reader.get_u16();
 
-                                        //u2 start_pc;    u2 length;        u2 index;
-                    (0..count).map(|_| (reader.get_u16(), reader.get_u16(), reader.get_u16())).collect()
-                }},
+                        //u2 start_pc;    u2 length;        u2 index;
+                        (0..count)
+                            .map(|_| (reader.get_u16(), reader.get_u16(), reader.get_u16()))
+                            .collect()
+                    },
+                },
                 // type in exception parameter declaration
-                0x42 => TargetInfo::Catch { idx: reader.get_u16() },
+                0x42 => TargetInfo::Catch {
+                    idx: reader.get_u16(),
+                },
                 // 0x43 type in instanceof expression
                 // 0x44 type in new expression
                 // 0x45 type in method reference expression using ::new
                 // 0x46 type in method reference expression using ::Identifier
-                subtype @ 0x43...0x46 => TargetInfo::Offset { subtype: subtype, idx: reader.get_u16() },
+                subtype @ 0x43...0x46 => TargetInfo::Offset {
+                    subtype: subtype,
+                    idx: reader.get_u16(),
+                },
                 // 0x48 type argument for generic constructor in new expression or explicit constructor invocation statement
                 // 0x49 type argument for generic method in method invocation expression
                 // 0x4A type argument for generic constructor in method reference expression using ::new
                 // 0x4B type argument for generic method in method reference expression using ::Identifier
-                subtype @ 0x47...0x4b => TargetInfo::TypeArgument { subtype: subtype, offset: reader.get_u16(), type_arg_idx: reader.get_u8() },
+                subtype @ 0x47...0x4b => TargetInfo::TypeArgument {
+                    subtype: subtype,
+                    offset: reader.get_u16(),
+                    type_arg_idx: reader.get_u8(),
+                },
                 // TODO replace the below fallback branch with proper error handling
-                _ => TargetInfo::Empty { subtype: 0 }
+                _ => TargetInfo::Empty { subtype: 0 },
             },
             target_path: TypePath {
                 path: {
                     let n = reader.get_u8();
-                    (0..n).map(|_| (match reader.get_u8() {
-                        0 => TypePathKind::Array,
-                        1 => TypePathKind::Nested,
-                        2 => TypePathKind::Wildcard,
-                        3 => TypePathKind::TypeArgument,
-                        // TODO replace the below fallback branch with proper error handling
-                        _ => TypePathKind::Array
-                    }, reader.get_u8())).collect()
-                }
+                    (0..n)
+                        .map(|_| {
+                            (
+                                match reader.get_u8() {
+                                    0 => TypePathKind::Array,
+                                    1 => TypePathKind::Nested,
+                                    2 => TypePathKind::Wildcard,
+                                    3 => TypePathKind::TypeArgument,
+                                    // TODO replace the below fallback branch with proper error handling
+                                    _ => TypePathKind::Array,
+                                },
+                                reader.get_u8(),
+                            )
+                        })
+                        .collect()
+                },
             },
             type_index: ConstantPoolIndex::new(reader.get_u16() as usize),
             element_value_pairs: {
                 let n = reader.get_u16();
-                (0..n).map(|_| ElementValuePair {
-                    element_name_index: ConstantPoolIndex::new(reader.get_u16() as usize),
-                    value: ClassReader::read_element_value(reader)
-                }).collect()
-            }
+                (0..n)
+                    .map(|_| ElementValuePair {
+                        element_name_index: ConstantPoolIndex::new(reader.get_u16() as usize),
+                        value: ClassReader::read_element_value(reader),
+                    })
+                    .collect()
+            },
         }
     }
 
@@ -844,19 +931,22 @@ impl ClassReader {
     fn read_constant_pool_index(reader: &mut BlockReader) -> Result<ConstantPoolIndex, Error> {
         match reader.read_u16() {
             Ok(idx) => Ok(ConstantPoolIndex::new(idx as usize)),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
-    fn require_n<T, U>(reader: &mut BlockReader, count: usize, extractor: U) -> Result<T, Error> where U: Fn(BlockReader) -> T {
+    fn require_n<T, U>(reader: &mut BlockReader, count: usize, extractor: U) -> Result<T, Error>
+    where
+        U: Fn(BlockReader) -> T,
+    {
         match reader.read_n(count) {
             Ok(bytes) => {
                 let mut cursor = Cursor::new(bytes);
                 let r = BlockReader::new(&mut cursor);
 
                 Ok(extractor(r))
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 }
@@ -864,13 +954,18 @@ impl ClassReader {
 // TODO remove pub after testing
 pub struct BlockReader<'a> {
     source: &'a mut Read,
-    position: usize
+    position: usize,
 }
 
 impl<'a> BlockReader<'a> {
-
-    pub fn new<T>(source: &'a mut T) -> BlockReader where T: Read {
-        BlockReader { source: source, position: 0 }
+    pub fn new<T>(source: &'a mut T) -> BlockReader
+    where
+        T: Read,
+    {
+        BlockReader {
+            source: source,
+            position: 0,
+        }
     }
 
     pub fn read_u64(&mut self) -> Result<u64, Error> {
@@ -880,17 +975,16 @@ impl<'a> BlockReader<'a> {
             Ok(_) => {
                 self.position += 8;
 
-                Ok(
-                ((buf[0] as u64) << 56) +
-                ((buf[1] as u64) << 48) +
-                ((buf[2] as u64) << 40) +
-                ((buf[3] as u64) << 32) +
-                ((buf[4] as u64) << 24) +
-                ((buf[5] as u64) << 16) +
-                ((buf[6] as u64) << 8) +
-                buf[7] as u64)
-            },
-            Err(err) => Err(err)
+                Ok(((buf[0] as u64) << 56)
+                    + ((buf[1] as u64) << 48)
+                    + ((buf[2] as u64) << 40)
+                    + ((buf[3] as u64) << 32)
+                    + ((buf[4] as u64) << 24)
+                    + ((buf[5] as u64) << 16)
+                    + ((buf[6] as u64) << 8)
+                    + buf[7] as u64)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -905,13 +999,12 @@ impl<'a> BlockReader<'a> {
         match self.source.read_exact(&mut buf) {
             Ok(_) => {
                 self.position += 4;
-                Ok(
-                ((buf[0] as u32) << 24) +
-                ((buf[1] as u32) << 16) +
-                ((buf[2] as u32) << 8) +
-                buf[3] as u32)
-            },
-            Err(err) => Err(err)
+                Ok(((buf[0] as u32) << 24)
+                    + ((buf[1] as u32) << 16)
+                    + ((buf[2] as u32) << 8)
+                    + buf[3] as u32)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -927,8 +1020,8 @@ impl<'a> BlockReader<'a> {
             Ok(_) => {
                 self.position += 2;
                 Ok(((buf[0] as u16) << 8) + buf[1] as u16)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -943,8 +1036,8 @@ impl<'a> BlockReader<'a> {
             Ok(_) => {
                 self.position += 1;
                 Ok(buf[0])
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -959,15 +1052,15 @@ impl<'a> BlockReader<'a> {
             Ok(_) => {
                 self.position += count;
                 Ok(tmp)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
     pub fn get_n(&mut self, count: usize) -> Vec<u8> {
         match self.read_n(count) {
             Ok(bytes) => bytes,
-            Err(_) => vec![]
+            Err(_) => vec![],
         }
     }
 
@@ -978,8 +1071,8 @@ impl<'a> BlockReader<'a> {
             Ok(_) => {
                 self.position += tmp.len();
                 Ok(tmp)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -996,7 +1089,6 @@ impl<'a> BlockReader<'a> {
     }
 }
 
-
 struct ClassFragment {
     pub version: Option<ClassfileVersion>,
     pub constant_pool: Option<ConstantPool>,
@@ -1006,7 +1098,7 @@ struct ClassFragment {
     pub interfaces: Option<Vec<ConstantPoolIndex>>,
     pub fields: Option<Vec<Field>>,
     pub methods: Option<Vec<Method>>,
-    pub attributes: Option<Vec<Attribute>>
+    pub attributes: Option<Vec<Attribute>>,
 }
 
 impl ClassFragment {
@@ -1035,7 +1127,7 @@ impl ClassFragment {
             interfaces: self.interfaces.unwrap_or(vec![]),
             fields: self.fields.unwrap_or(vec![]),
             methods: self.methods.unwrap_or(vec![]),
-            attributes: self.attributes.unwrap_or(vec![])
+            attributes: self.attributes.unwrap_or(vec![]),
         }
     }
 }
@@ -1051,7 +1143,7 @@ impl Default for ClassFragment {
             interfaces: None,
             fields: None,
             methods: None,
-            attributes: None
+            attributes: None,
         }
     }
 }

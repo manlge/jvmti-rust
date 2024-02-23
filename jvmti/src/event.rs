@@ -1,12 +1,18 @@
+use crate::{
+    environment::Environment,
+    native::{JNIEnvPtr, JVMTIEnvPtr},
+};
+
 use super::native::jvmti_native::*;
 use super::runtime::*;
 use super::thread::Thread;
 
-pub type FnMethodEntry = fn(event: MethodInvocationEvent) -> ();
-pub type FnMethodExit = fn(event: MethodInvocationEvent) -> ();
-pub type FnVMInit = fn() -> ();
+pub type FnMethodEntry = fn(env: Environment, event: MethodInvocationEvent) -> ();
+pub type FnMethodExit =
+    fn(env: Environment, thread: jthread, event: MethodInvocationEvent, value: *const jvalue) -> ();
+pub type FnVMInit = fn(jvmti: JVMTIEnvPtr, jni: JNIEnvPtr, jthread) -> ();
 pub type FnVMDeath = fn() -> ();
-pub type FnVMStart = fn() -> ();
+pub type FnVMStart = fn(env: Environment) -> ();
 pub type FnVMObjectAlloc = fn(event: ObjectAllocationEvent) -> ();
 pub type FnVMObjectFree = fn() -> ();
 pub type FnThreadStart = fn(thread: Thread) -> ();
@@ -71,7 +77,7 @@ pub enum VMEvent {
     CompiledMethodUnload = JVMTI_EVENT_COMPILED_METHOD_UNLOAD as isize,
     DynamicCodeGenerated = JVMTI_EVENT_DYNAMIC_CODE_GENERATED as isize,
     DataDumpRequest = JVMTI_EVENT_DATA_DUMP_REQUEST as isize,
-    ResourceExhausted = JVMTI_EVENT_RESOURCE_EXHAUSTED as isize
+    ResourceExhausted = JVMTI_EVENT_RESOURCE_EXHAUSTED as isize,
 }
 
 ///
@@ -110,12 +116,13 @@ pub struct EventCallbacks {
     pub compiled_method_unload: Option<FnCompiledMethodUnload>,
     pub dynamic_code_generated: Option<FnDynamicCodeGenerated>,
     pub data_dump_request: Option<FnDataDumpRequest>,
-    pub resource_exhausted: Option<FnResourceExhausted>
+    pub resource_exhausted: Option<FnResourceExhausted>,
 }
 
 impl EventCallbacks {
-
     pub fn new() -> EventCallbacks {
-        EventCallbacks { ..Default::default() }
+        EventCallbacks {
+            ..Default::default()
+        }
     }
 }

@@ -1,8 +1,13 @@
+use crate::{
+    environment::Environment,
+    native::jvmti_native::{jmethodID, jthread},
+};
+
 use super::capabilities::Capabilities;
 use super::class::{ClassId, ClassSignature};
-use super::error::NativeError;
 use super::environment::jvm::JVMF;
-use super::environment::jvmti::{JVMTI};
+use super::environment::jvmti::JVMTI;
+use super::error::NativeError;
 use super::event::{EventCallbacks, VMEvent};
 use super::mem::MemoryAllocation;
 use super::method::{MethodId, MethodSignature};
@@ -16,7 +21,7 @@ use std::collections::HashMap;
 pub struct JVMEmulator {
     pub capabilities: Capabilities,
     pub callbacks: EventCallbacks,
-    pub events: HashMap<VMEvent, bool>
+    pub events: HashMap<VMEvent, bool>,
 }
 
 impl JVMEmulator {
@@ -24,16 +29,16 @@ impl JVMEmulator {
         JVMEmulator {
             capabilities: Capabilities::new(),
             callbacks: EventCallbacks::new(),
-            events: HashMap::new()
+            events: HashMap::new(),
         }
     }
 
-    pub fn emit_method_entry(&self, event: MethodInvocationEvent) {
+    pub fn emit_method_entry(&self, env: Environment, event: MethodInvocationEvent) {
         match self.callbacks.method_entry {
             Some(handler) => {
-                handler(event);
-            },
-            _ => ()
+                handler(env, event);
+            }
+            _ => (),
         }
     }
 }
@@ -46,15 +51,21 @@ impl JVMF for JVMEmulator {
     fn destroy(&self) -> Result<(), NativeError> {
         Ok(())
     }
+
+    fn attach_current_thread(&self) -> Result<(), NativeError> {
+        Ok(())
+    }
 }
 
 impl JVMTI for JVMEmulator {
-
     fn get_version_number(&self) -> VersionNumber {
         VersionNumber::unknown()
     }
 
-    fn add_capabilities(&mut self, new_capabilities: &Capabilities) -> Result<Capabilities, NativeError> {
+    fn add_capabilities(
+        &mut self,
+        new_capabilities: &Capabilities,
+    ) -> Result<Capabilities, NativeError> {
         let merged = self.capabilities.merge(&new_capabilities);
         self.capabilities = merged;
         Ok(self.capabilities.clone())
@@ -77,34 +88,109 @@ impl JVMTI for JVMEmulator {
 
     fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError> {
         match *thread_id as u64 {
-            _ => Err(NativeError::NotImplemented)
+            _ => Err(NativeError::NotImplemented),
         }
     }
 
     fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError> {
         match method_id.native_id as u64 {
-            _ => Err(NativeError::NotImplemented)
+            _ => Err(NativeError::NotImplemented),
         }
     }
 
-    fn get_method_name(&self, method_id: &MethodId) -> Result<MethodSignature, NativeError> {
-        match method_id.native_id as u64 {
-            0x01 => Ok(MethodSignature::new("".to_string())),
-            _ => Err(NativeError::NotImplemented)
+    fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError> {
+        match method_id as u64 {
+            0x01 => Ok(MethodSignature::new("".to_string(), "".to_string())),
+            _ => Err(NativeError::NotImplemented),
         }
     }
 
     fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError> {
         match class_id.native_id as u64 {
-            _ => Err(NativeError::NotImplemented)
+            _ => Err(NativeError::NotImplemented),
         }
     }
 
     fn allocate(&self, len: usize) -> Result<MemoryAllocation, NativeError> {
-        Ok(MemoryAllocation { ptr: ::std::ptr::null_mut(), len: len })
+        Ok(MemoryAllocation {
+            ptr: ::std::ptr::null_mut(),
+            len: len,
+        })
     }
 
-    fn deallocate(&self) {
+    fn deallocate(&self) {}
 
+    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+        unimplemented!()
+    }
+
+    fn run_agent_thread(
+        &self,
+        thread: crate::native::jvmti_native::jthread,
+        proc: crate::native::jvmti_native::jvmtiStartFunction,
+        arg: *const std::os::raw::c_void,
+        priority: crate::native::jvmti_native::jint,
+    ) -> Result<(), NativeError> {
+        Ok(())
+    }
+
+    fn get_stack_trace(
+        &self,
+        thread: crate::native::jvmti_native::jthread,
+    ) -> Result<(), NativeError> {
+        Ok(())
+    }
+
+    fn get_local_object(
+        &self,
+        thread: crate::native::jvmti_native::jthread,
+        depth: crate::native::jvmti_native::jint,
+        slot: crate::native::jvmti_native::jint,
+    ) -> Result<crate::native::jvmti_native::jobject, NativeError> {
+        unimplemented!()
+    }
+
+    fn get_thread_state(&self, thread: jthread) -> Result<u32, NativeError> {
+        unimplemented!()
+    }
+
+    fn add_to_bootstrap_classloader_search(&self, class_path: &str) -> Result<(), NativeError> {
+        unimplemented!()
+    }
+
+    fn raw_monitor_enter(
+        &self,
+        monitor: crate::native::jvmti_native::jrawMonitorID,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn raw_monitor_exit(
+        &self,
+        monitor: crate::native::jvmti_native::jrawMonitorID,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn create_raw_monitor(
+        &self,
+        name: &str,
+    ) -> Result<crate::native::jvmti_native::jrawMonitorID, NativeError> {
+        todo!()
+    }
+
+    fn destroy_raw_monitor(
+        &self,
+        monitor: crate::native::jvmti_native::jrawMonitorID,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn retransform_classes(
+        &self,
+        count: crate::native::jvmti_native::jint,
+        class: *const crate::native::jvmti_native::jclass,
+    ) -> Result<(), NativeError> {
+        todo!()
     }
 }

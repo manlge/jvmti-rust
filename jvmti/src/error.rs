@@ -1,5 +1,5 @@
-
 /// A type-safe representation of possible errors
+#[derive(Debug)]
 pub enum NativeError {
     NoError = 0,
     MustPossessCapability = 99,
@@ -11,7 +11,8 @@ pub enum NativeError {
     ThreadNotAttached = 115,
     Disconnected = 116,
     NotImplemented = 999999, // <- now this is a "temporary" hack until the library is under heavy development
-    UnknownError
+    UnknownError,
+    ThreadNotAlive = 15,
 }
 
 /// Turn a native error code into a type-safe error
@@ -27,7 +28,11 @@ pub fn wrap_error(code: u32) -> NativeError {
         115 => NativeError::ThreadNotAttached,
         116 => NativeError::Disconnected,
         999999 => NativeError::NotImplemented,
-        _ => { println!("Unknown error code was detected: {}", code); NativeError::UnknownError }
+        15 => NativeError::ThreadNotAlive,
+        _ => {
+            println!("Unknown error code was detected: {}", code);
+            NativeError::UnknownError
+        }
     }
 }
 
@@ -44,6 +49,7 @@ pub fn translate_error(code: &NativeError) -> String {
         &NativeError::ThreadNotAttached => "The thread being used to call this function is not attached to the virtual machine. Calls must be made from attached threads.",
         &NativeError::Disconnected => "The JVM TI environment provided is no longer connected or is not an environment.",
         &NativeError::NotImplemented => "This function is not implemented yet",
-        &NativeError::UnknownError => "Unknown error."
+        &NativeError::UnknownError => "Unknown error.",
+        &NativeError::ThreadNotAlive => "thread is not live (has not been started or is now dead).",
     }.to_string()
 }

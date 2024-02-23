@@ -28,7 +28,10 @@ mod tests {
         assert_eq!(false, agent.capabilities.can_generate_monitor_events);
         assert_eq!(false, agent.capabilities.can_generate_method_entry_events);
         assert_eq!(false, agent.capabilities.can_generate_method_exit_events);
-        assert_eq!(false, agent.capabilities.can_generate_vm_object_alloc_events);
+        assert_eq!(
+            false,
+            agent.capabilities.can_generate_vm_object_alloc_events
+        );
         assert_eq!(false, agent.capabilities.can_generate_breakpoint_events);
         // TODO this test is not complete at all. surprisingly
     }

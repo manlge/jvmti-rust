@@ -7,13 +7,13 @@ extern crate toml;
 extern crate serde_derive;
 
 use agent::Agent;
-use bytecode::printer::ClassfilePrinter;
 use bytecode::classfile::Constant;
 use bytecode::io::ClassWriter;
+use bytecode::printer::ClassfilePrinter;
 use config::Config;
 use context::static_context;
 use instrumentation::asm::transformer::Transformer;
-use native::{JavaVMPtr, MutString, VoidPtr, ReturnValue};
+use native::{JVMTIEnvPtr, JavaVMPtr, MutString, ReturnValue, VoidPtr};
 use options::Options;
 use runtime::*;
 use std::io::Cursor;
