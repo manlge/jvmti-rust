@@ -30,6 +30,7 @@ pub trait JNI {
     fn call_static_boolean_method(&self, class: jclass, method: jmethodID) -> bool;
     fn call_static_object_method(&self, class: jclass, method: jmethodID) -> jobject;
     fn call_long_method(&self, class: jclass, method: jmethodID) -> jlong;
+    fn call_object_method(&self, class: jclass, method: jmethodID) -> jobject;
     fn del_local_ref(&self, obj: jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
@@ -177,6 +178,10 @@ impl JNI for JNIEnvironment {
 
     fn call_long_method(&self, obj: jobject, method: jmethodID) -> jlong {
         unsafe { (**self.jni).CallLongMethod.unwrap()(self.jni, obj, method) }
+    }
+
+    fn call_object_method(&self, obj: jobject, method: jmethodID) -> jobject {
+        unsafe { (**self.jni).CallObjectMethod.unwrap()(self.jni, obj, method) }
     }
 
     fn del_local_ref(&self, obj: jobject) {

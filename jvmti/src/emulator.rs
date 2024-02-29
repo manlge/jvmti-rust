@@ -1,6 +1,6 @@
 use crate::{
     environment::Environment,
-    native::jvmti_native::{jmethodID, jthread},
+    native::jvmti_native::{jlong, jmethodID, jobject, jthread},
 };
 
 use super::capabilities::Capabilities;
@@ -190,6 +190,29 @@ impl JVMTI for JVMEmulator {
         &self,
         count: crate::native::jvmti_native::jint,
         class: *const crate::native::jvmti_native::jclass,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn iterate_over_instances_of_class(
+        &self,
+        klass: crate::native::jvmti_native::jclass,
+        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
+        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        user_data: *const std::os::raw::c_void,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+        todo!()
+    }
+
+    fn iterate_over_heap(
+        &self,
+        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
+        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        user_data: *const std::os::raw::c_void,
     ) -> Result<(), NativeError> {
         todo!()
     }

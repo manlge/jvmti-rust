@@ -69,6 +69,20 @@ pub trait JVMTI {
     fn create_raw_monitor(&self, name: &str) -> Result<jrawMonitorID, NativeError>;
     fn destroy_raw_monitor(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
     fn retransform_classes(&self, count: jint, class: *const jclass) -> Result<(), NativeError>;
+    fn iterate_over_heap(
+        &self,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError>;
+    fn iterate_over_instances_of_class(
+        &self,
+        klass: jclass,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError>;
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
 }
 
 pub struct JVMTIEnvironment {
@@ -455,6 +469,87 @@ impl JVMTI for JVMTIEnvironment {
                 self.jvmti, count, class,
             )) {
                 NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn iterate_over_heap(
+        &self,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).IterateOverHeap.unwrap()(
+                self.jvmti,
+                object_filter,
+                heap_object_callback,
+                user_data,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn iterate_over_instances_of_class(
+        &self,
+        klass: jclass,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).IterateOverInstancesOfClass.unwrap()(
+                self.jvmti,
+                klass,
+                object_filter,
+                heap_object_callback,
+                user_data,
+            )) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+        let mut count: jint = 0;
+        let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
+        let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
+
+        // unsafe {
+        //     match wrap_error((**self.jvmti).GetObjectsWithTags.unwrap()(
+        //         self.jvmti,
+        //         tags_list.len() as i32,
+        //         tags_list.as_ptr(),
+        //         &mut count,
+        //         &mut object_result_ptr,
+        //         &mut tag_result_ptr,
+        //     )) {
+        //         NativeError::NoError => Ok(Vec::from_raw_parts(
+        //             object_result_ptr,
+        //             count as usize,
+        //             count as usize,
+        //         )),
+        //         err @ _ => Err(err),
+        //     }
+        // }
+
+        unsafe {
+            match wrap_error((**self.jvmti).GetObjectsWithTags.unwrap()(
+                self.jvmti,
+                tags_list.len() as i32,
+                tags_list.as_ptr(),
+                &mut count,
+                &mut object_result_ptr,
+                &mut tag_result_ptr,
+            )) {
+                NativeError::NoError => Ok(std::slice::from_raw_parts(
+                    object_result_ptr,
+                    count as usize,
+                )),
                 err @ _ => Err(err),
             }
         }

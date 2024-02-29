@@ -1,4 +1,6 @@
-use crate::native::jvmti_native::{jmethodID, jobject, jthread};
+use std::os::raw::c_void;
+
+use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, JVMTI_ITERATION_CONTINUE};
 
 use self::jni::{JNIEnvironment, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
@@ -153,6 +155,35 @@ impl JVMTI for Environment {
     ) -> Result<(), NativeError> {
         self.jvmti.retransform_classes(count, class)
     }
+
+    fn iterate_over_instances_of_class(
+        &self,
+        klass: crate::native::jvmti_native::jclass,
+        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
+        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        user_data: *const std::os::raw::c_void,
+    ) -> Result<(), NativeError> {
+        self.jvmti.iterate_over_instances_of_class(
+            klass,
+            object_filter,
+            heap_object_callback,
+            user_data,
+        )
+    }
+
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+        self.jvmti.get_object_with_tag(tags_list)
+    }
+
+    fn iterate_over_heap(
+        &self,
+        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
+        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError> {
+        self.jvmti
+            .iterate_over_heap(object_filter, heap_object_callback, user_data)
+    }
 }
 
 impl JNI for Environment {
@@ -259,5 +290,9 @@ impl JNI for Environment {
         sig: &str,
     ) -> crate::native::jvmti_native::jfieldID {
         self.jni.get_field_id(class, name, sig)
+    }
+
+    fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject {
+        self.jni.call_object_method(object, method)
     }
 }
