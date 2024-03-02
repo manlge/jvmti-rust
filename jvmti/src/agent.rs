@@ -65,7 +65,7 @@ impl Agent {
         self.jvm.destroy()
     }
 
-    pub fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+    pub fn get_all_threads(&self) -> Result<&[jthread], NativeError> {
         self.environment.get_all_threads()
     }
 

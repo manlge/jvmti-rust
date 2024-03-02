@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, JVMTI_ITERATION_CONTINUE};
+use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo};
 
 use self::jni::{JNIEnvironment, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
@@ -10,7 +10,7 @@ use super::error::NativeError;
 use super::event::{EventCallbacks, VMEvent};
 use super::mem::MemoryAllocation;
 use super::method::{MethodId, MethodSignature};
-use super::native::{JavaObject, JavaThread};
+use super::native::JavaObject;
 use super::thread::Thread;
 use super::version::VersionNumber;
 
@@ -78,11 +78,11 @@ impl JVMTI for Environment {
         self.jvmti.allocate(len)
     }
 
-    fn deallocate(&self) {
-        self.jvmti.deallocate()
+    fn deallocate(&self, mem: *mut u8) -> Result<(), NativeError> {
+        self.jvmti.deallocate(mem)
     }
 
-    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+    fn get_all_threads(&self) -> Result<&[jthread], NativeError> {
         self.jvmti.get_all_threads()
     }
 
@@ -99,7 +99,7 @@ impl JVMTI for Environment {
     fn get_stack_trace(
         &self,
         thread: crate::native::jvmti_native::jthread,
-    ) -> Result<(), NativeError> {
+    ) -> Result<&[jvmtiFrameInfo], NativeError> {
         self.jvmti.get_stack_trace(thread)
     }
 
@@ -183,6 +183,10 @@ impl JVMTI for Environment {
     ) -> Result<(), NativeError> {
         self.jvmti
             .iterate_over_heap(object_filter, heap_object_callback, user_data)
+    }
+
+    fn get_current_thread(&self) -> Result<jthread, NativeError> {
+        self.jvmti.get_current_thread()
     }
 }
 

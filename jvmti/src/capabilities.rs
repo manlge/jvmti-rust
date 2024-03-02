@@ -103,6 +103,7 @@ impl Capabilities {
             can_redefine_any_class: true,
             can_redefine_classes: true,
             can_tag_objects: true,
+            can_get_thread_cpu_time: true,
             ..Default::default()
         }
     }

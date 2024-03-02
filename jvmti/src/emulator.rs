@@ -1,6 +1,9 @@
 use crate::{
-    environment::Environment,
-    native::jvmti_native::{jlong, jmethodID, jobject, jthread},
+    environment::{jni::JNI, Environment},
+    native::{
+        jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
+        JNIEnvPtr,
+    },
 };
 
 use super::capabilities::Capabilities;
@@ -52,8 +55,8 @@ impl JVMF for JVMEmulator {
         Ok(())
     }
 
-    fn attach_current_thread(&self) -> Result<(), NativeError> {
-        Ok(())
+    fn attach_current_thread(&self, thread_name: &str) -> Result<Box<dyn JNI>, NativeError> {
+        unimplemented!()
     }
 }
 
@@ -118,9 +121,11 @@ impl JVMTI for JVMEmulator {
         })
     }
 
-    fn deallocate(&self) {}
+    fn deallocate(&self, mem: *mut u8) -> Result<(), NativeError> {
+        unimplemented!()
+    }
 
-    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+    fn get_all_threads(&self) -> Result<&[jthread], NativeError> {
         unimplemented!()
     }
 
@@ -137,8 +142,8 @@ impl JVMTI for JVMEmulator {
     fn get_stack_trace(
         &self,
         thread: crate::native::jvmti_native::jthread,
-    ) -> Result<(), NativeError> {
-        Ok(())
+    ) -> Result<&[jvmtiFrameInfo], NativeError> {
+        unimplemented!()
     }
 
     fn get_local_object(
@@ -214,6 +219,10 @@ impl JVMTI for JVMEmulator {
         heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
         user_data: *const std::os::raw::c_void,
     ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn get_current_thread(&self) -> Result<jthread, NativeError> {
         todo!()
     }
 }

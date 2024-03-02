@@ -46,8 +46,8 @@ pub trait JVMTI {
     fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError>;
     fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError>;
     fn allocate(&self, len: usize) -> Result<MemoryAllocation, NativeError>;
-    fn deallocate(&self);
-    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError>;
+    fn deallocate(&self, mem: *mut u8) -> Result<(), NativeError>;
+    fn get_all_threads(&self) -> Result<&[jthread], NativeError>;
     fn get_local_object(
         &self,
         thread: jthread,
@@ -61,7 +61,8 @@ pub trait JVMTI {
         arg: *const c_void,
         priority: jint,
     ) -> Result<(), NativeError>;
-    fn get_stack_trace(&self, thread: jthread) -> Result<(), NativeError>;
+    fn get_current_thread(&self) -> Result<jthread, NativeError>;
+    fn get_stack_trace(&self, thread: jthread) -> Result<&[jvmtiFrameInfo], NativeError>;
     fn get_thread_state(&self, thread: jthread) -> Result<u32, NativeError>;
     fn add_to_bootstrap_classloader_search(&self, class_path: &str) -> Result<(), NativeError>;
     fn raw_monitor_enter(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
@@ -198,7 +199,7 @@ impl JVMTI for JVMTIEnvironment {
             thread_group: ptr::null_mut(),
             context_class_loader: ptr::null_mut(),
         };
-        let mut info_ptr = &mut info;
+        let info_ptr = &mut info;
 
         unsafe {
             match (**self.jvmti).GetThreadInfo {
@@ -257,25 +258,20 @@ impl JVMTI for JVMTIEnvironment {
 
     fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError> {
         let mut method_name = ptr::null_mut();
-        let mut method_ptr = &mut method_name;
-
         let mut signature: MutString = ptr::null_mut();
-        let mut signature_ptr = &mut signature;
-
         let mut generic_sig: MutString = ptr::null_mut();
-        let mut generic_sig_ptr = &mut generic_sig;
 
         unsafe {
             match wrap_error((**self.jvmti).GetMethodName.unwrap()(
                 self.jvmti,
                 method_id,
-                method_ptr,
-                signature_ptr,
-                generic_sig_ptr,
+                &mut method_name,
+                &mut signature,
+                &mut generic_sig,
             )) {
                 NativeError::NoError => Ok(MethodSignature::new(
-                    stringify(*method_ptr),
-                    stringify(*signature_ptr),
+                    stringify(method_name),
+                    stringify(signature),
                 )),
                 err @ _ => Err(err),
             }
@@ -317,9 +313,16 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn deallocate(&self) {}
+    fn deallocate(&self, mem: *mut u8) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).Deallocate.unwrap()(self.jvmti, mem)) {
+                NativeError::NoError => Ok(()),
+                err @ _ => Err(err),
+            }
+        }
+    }
 
-    fn get_all_threads(&self) -> Result<Vec<jthread>, NativeError> {
+    fn get_all_threads(&self) -> Result<&[jthread], NativeError> {
         let mut threads_count: jint = 0;
         let mut threads_ptr: *mut jthread = std::ptr::null_mut();
 
@@ -330,11 +333,7 @@ impl JVMTI for JVMTIEnvironment {
                 &mut threads_ptr,
             )) {
                 NativeError::NoError => {
-                    let threads = Vec::from_raw_parts(
-                        threads_ptr,
-                        threads_count as usize,
-                        threads_count as usize,
-                    );
+                    let threads = std::slice::from_raw_parts(threads_ptr, threads_count as usize);
 
                     Ok(threads)
                 }
@@ -360,26 +359,23 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_stack_trace(&self, thread: jthread) -> Result<(), NativeError> {
+    fn get_stack_trace(&self, thread: jthread) -> Result<&[jvmtiFrameInfo], NativeError> {
         unsafe {
             let mut count: jint = 0;
-            let mut info = vec![jvmtiFrameInfo::default(); 100];
-            // let stacktrace = std::slice::from_raw_parts(info, count as usize);
-            println!("stacktrace count: {}", count);
-            // for s in stacktrace {
-            //     let x = self.get_method_name(s.method).unwrap();
-            //     println!("name: {}, {}", x.name, x.signature);
-            // }
+            let mut info = [jvmtiFrameInfo::default(); 1024];
 
             match wrap_error((**self.jvmti).GetStackTrace.unwrap()(
                 self.jvmti,
                 thread,
                 0,
-                100,
+                info.len() as i32,
                 info.as_mut_ptr(),
                 &mut count,
             )) {
-                NativeError::NoError => Ok(()),
+                NativeError::NoError => Ok(std::slice::from_raw_parts(
+                    info.as_mut_ptr(),
+                    count as usize,
+                )),
                 err @ _ => Err(err),
             }
         }
@@ -519,24 +515,6 @@ impl JVMTI for JVMTIEnvironment {
         let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
         let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
 
-        // unsafe {
-        //     match wrap_error((**self.jvmti).GetObjectsWithTags.unwrap()(
-        //         self.jvmti,
-        //         tags_list.len() as i32,
-        //         tags_list.as_ptr(),
-        //         &mut count,
-        //         &mut object_result_ptr,
-        //         &mut tag_result_ptr,
-        //     )) {
-        //         NativeError::NoError => Ok(Vec::from_raw_parts(
-        //             object_result_ptr,
-        //             count as usize,
-        //             count as usize,
-        //         )),
-        //         err @ _ => Err(err),
-        //     }
-        // }
-
         unsafe {
             match wrap_error((**self.jvmti).GetObjectsWithTags.unwrap()(
                 self.jvmti,
@@ -550,6 +528,19 @@ impl JVMTI for JVMTIEnvironment {
                     object_result_ptr,
                     count as usize,
                 )),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_current_thread(&self) -> Result<jthread, NativeError> {
+        let mut thread: jthread = unsafe { std::mem::zeroed() };
+        unsafe {
+            match wrap_error((**self.jvmti).GetCurrentThread.unwrap()(
+                self.jvmti,
+                &mut thread,
+            )) {
+                NativeError::NoError => Ok(thread),
                 err @ _ => Err(err),
             }
         }

@@ -29,8 +29,8 @@ pub trait JNI {
     fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
     fn call_static_boolean_method(&self, class: jclass, method: jmethodID) -> bool;
     fn call_static_object_method(&self, class: jclass, method: jmethodID) -> jobject;
-    fn call_long_method(&self, class: jclass, method: jmethodID) -> jlong;
-    fn call_object_method(&self, class: jclass, method: jmethodID) -> jobject;
+    fn call_long_method(&self, object: jobject, method: jmethodID) -> jlong;
+    fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject;
     fn del_local_ref(&self, obj: jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;

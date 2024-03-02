@@ -1,14 +1,30 @@
-use super::super::environment::jvmti::{JVMTIEnvironment, JVMTI};
-use super::super::error::{wrap_error, NativeError};
+use crate::{
+    native::{
+        jvmti_native::{jint, JavaVMAttachArgs},
+        JNIEnvPtr,
+    },
+    options::Options,
+};
+
 use super::super::native::jvmti_native::JVMTI_VERSION;
 use super::super::native::{JVMTIEnvPtr, JavaVMPtr};
+use super::{
+    super::environment::jvmti::{JVMTIEnvironment, JVMTI},
+    jni::JNI,
+};
+use super::{
+    super::error::{wrap_error, NativeError},
+    jni::JNIEnvironment,
+};
 use libc::c_void;
-use std::ptr;
+use std::{ffi::CString, ptr};
+
+pub const JNI_VERSION_1_6: jint = 0x00010006;
 
 pub trait JVMF {
     fn get_environment(&self) -> Result<Box<JVMTI>, NativeError>;
     fn destroy(&self) -> Result<(), NativeError>;
-    fn attach_current_thread(&self) -> Result<(), NativeError>;
+    fn attach_current_thread(&self, thread_name: &str) -> Result<Box<dyn JNI>, NativeError>;
 }
 ///
 /// `JVMAgent` represents a binding to the JVM.
@@ -57,15 +73,24 @@ impl JVMF for JVMAgent {
         }
     }
 
-    fn attach_current_thread(&self) -> Result<(), NativeError> {
+    fn attach_current_thread(&self, thread_name: &str) -> Result<Box<dyn JNI>, NativeError> {
+        let thread_name = CString::new(thread_name).unwrap();
         unsafe {
-            let x = ptr::null_mut();
-            let x1 = ptr::null_mut();
+            let mut env = ptr::null_mut();
+            let mut args: JavaVMAttachArgs = JavaVMAttachArgs {
+                version: JNI_VERSION_1_6,
+                name: thread_name.as_ptr() as *mut _,
+                group: std::ptr::null_mut(),
+            };
 
-            let error = (**self.vm).AttachCurrentThread.unwrap()(self.vm, x, x1) as u32;
+            let error = (**self.vm).AttachCurrentThread.unwrap()(
+                self.vm,
+                &mut env,
+                &mut args as *const _ as *mut _,
+            ) as u32;
 
             if error == 0 {
-                Ok(())
+                Ok(Box::new(JNIEnvironment::new(env as JNIEnvPtr)))
             } else {
                 Err(wrap_error(error))
             }
