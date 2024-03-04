@@ -13,7 +13,7 @@ use bytecode::printer::ClassfilePrinter;
 use config::Config;
 use context::static_context;
 use instrumentation::asm::transformer::Transformer;
-use native::{JVMTIEnvPtr, JavaVMPtr, MutString, ReturnValue, VoidPtr};
+use native::{jvmti_native::jobject, JVMTIEnvPtr, JavaVMPtr, MutString, ReturnValue, VoidPtr};
 use options::Options;
 use runtime::*;
 use std::io::Cursor;

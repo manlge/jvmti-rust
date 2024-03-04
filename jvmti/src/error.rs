@@ -36,6 +36,12 @@ pub fn wrap_error(code: u32) -> NativeError {
     }
 }
 
+impl std::fmt::Display for NativeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", translate_error(self))
+    }
+}
+
 /// Turn native error codes into meaningful and user-readable strings
 pub fn translate_error(code: &NativeError) -> String {
     match code {

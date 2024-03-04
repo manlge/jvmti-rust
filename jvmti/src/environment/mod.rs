@@ -1,8 +1,8 @@
 use std::os::raw::c_void;
 
-use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo};
+use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvalue, jvmtiFrameInfo};
 
-use self::jni::{JNIEnvironment, JNI};
+use self::jni::{JNIEnvironment, JNIError, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
 use super::capabilities::Capabilities;
 use super::class::{ClassId, ClassSignature};
@@ -195,16 +195,16 @@ impl JNI for Environment {
         self.jni.get_object_class(object_id)
     }
 
-    fn find_class(&self, clazz: &str) -> ClassId {
+    fn find_class(&self, clazz: &str) -> Result<ClassId, JNIError> {
         self.jni.find_class(clazz)
     }
 
-    fn get_method_id(&self, class: &ClassId, name: &str, sig: &str) -> MethodId {
-        self.jni.get_method_id(class, name, sig)
+    fn get_method(&self, class: &ClassId, name: &str, sig: &str) -> Result<MethodId, JNIError> {
+        self.jni.get_method(class, name, sig)
     }
 
-    fn new_object_a(&self, class: &ClassId, method: &MethodId, arg: jobject) -> JavaObject {
-        self.jni.new_object_a(class, method, arg)
+    fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject {
+        self.jni.new_object(class, method, args)
     }
 
     fn is_instance_of(
@@ -223,8 +223,13 @@ impl JNI for Environment {
         self.jni.call_static_boolean_method(class, method)
     }
 
-    fn get_static_method_id(&self, class: &ClassId, name: &str, sig: &str) -> jmethodID {
-        self.jni.get_static_method_id(class, name, sig)
+    fn get_static_method(
+        &self,
+        class: &ClassId,
+        name: &str,
+        sig: &str,
+    ) -> Result<MethodId, JNIError> {
+        self.jni.get_static_method(class, name, sig)
     }
 
     fn new_string_utf(&self, str: &str) -> crate::native::jvmti_native::jstring {
@@ -243,8 +248,9 @@ impl JNI for Environment {
         &self,
         class: crate::native::jvmti_native::jclass,
         method: jmethodID,
+        args: &[jvalue],
     ) -> jobject {
-        self.jni.call_static_object_method(class, method)
+        self.jni.call_static_object_method(class, method, args)
     }
 
     fn get_string_utf_chars(&self, str: crate::native::jvmti_native::jstring) -> String {
