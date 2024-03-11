@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::{ffi::CString, fmt::Display};
 
 use crate::{
     method::MethodId,
@@ -19,18 +19,7 @@ pub enum JNIError {
     ClassNotFound(String),
     MethodNotFound(String, String),
     FieldNotFound(String),
-}
-
-impl std::fmt::Display for JNIError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JNIError::ClassNotFound(class) => write!(f, "class: {class} not found"),
-            JNIError::MethodNotFound(method, signature) => {
-                write!(f, "method: {method}{signature} not found")
-            }
-            JNIError::FieldNotFound(field) => write!(f, "field: {field} not found"),
-        }
-    }
+    ObjectIsNull,
 }
 
 impl From<jint> for jvalue {
@@ -145,9 +134,12 @@ pub trait JNI {
     ) -> Result<MethodId, JNIError>;
     fn get_field_id(&self, class: jclass, name: &str, sig: &str) -> jfieldID;
     fn new_string_utf(&self, str: &str) -> jstring;
-    fn get_string_utf_chars(&self, str: jstring) -> String;
+    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError>;
     fn release_string_utf_chars(&self, str: jstring, chars: *const i8);
     fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject;
+    fn new_global_ref(&self, object: jobject) -> jobject;
+    fn delete_global_ref(&self, object: jobject);
+
     fn is_instance_of(&self, object: jobject, class: jclass) -> bool;
     fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
     fn call_static_boolean_method(&self, class: jclass, method: jmethodID) -> bool;
@@ -158,10 +150,12 @@ pub trait JNI {
         args: &[jvalue],
     ) -> jobject;
     fn call_long_method(&self, object: jobject, method: jmethodID) -> jlong;
-    fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject;
-    fn del_local_ref(&self, obj: jobject);
+    fn call_object_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jobject;
+    fn delete_local_ref(&self, obj: jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
+    fn get_array_length(&self, array: jarray) -> jsize;
+    fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject;
 }
 
 ///
@@ -318,13 +312,18 @@ impl JNI for JNIEnvironment {
         }
     }
 
-    fn get_string_utf_chars(&self, str: jstring) -> String {
-        let mut is_copy: jboolean = 1;
+    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError> {
+        if str.is_null() {
+            return Err(JNIError::ObjectIsNull);
+        }
+        let mut is_copy: jboolean = FALSE;
         unsafe {
             let chars = (**self.jni).GetStringUTFChars.unwrap()(self.jni, str, &mut is_copy);
             let ret = stringify(chars);
-            self.release_string_utf_chars(str, chars);
-            ret
+            if !chars.is_null() {
+                self.release_string_utf_chars(str, chars);
+            }
+            Ok(ret)
         }
     }
 
@@ -338,11 +337,27 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).CallLongMethod.unwrap()(self.jni, obj, method) }
     }
 
-    fn call_object_method(&self, obj: jobject, method: jmethodID) -> jobject {
-        unsafe { (**self.jni).CallObjectMethod.unwrap()(self.jni, obj, method) }
+    fn call_object_method(&self, obj: jobject, method: jmethodID, args: &[jvalue]) -> jobject {
+        unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, method, args.as_ptr()) }
     }
 
-    fn del_local_ref(&self, obj: jobject) {
+    fn delete_local_ref(&self, obj: jobject) {
         unsafe { (**self.jni).DeleteLocalRef.unwrap()(self.jni, obj) }
+    }
+
+    fn new_global_ref(&self, object: jobject) -> jobject {
+        unsafe { (**self.jni).NewGlobalRef.unwrap()(self.jni, object) }
+    }
+
+    fn delete_global_ref(&self, object: jobject) {
+        unsafe { (**self.jni).DeleteGlobalRef.unwrap()(self.jni, object) }
+    }
+
+    fn get_array_length(&self, array: jarray) -> jsize {
+        unsafe { (**self.jni).GetArrayLength.unwrap()(self.jni, array) }
+    }
+
+    fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject {
+        unsafe { (**self.jni).GetObjectArrayElement.unwrap()(self.jni, array, index) }
     }
 }

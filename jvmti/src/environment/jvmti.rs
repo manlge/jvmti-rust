@@ -14,11 +14,7 @@ use super::super::native::{
 use super::super::thread::{Thread, ThreadId};
 use super::super::util::stringify;
 use super::super::version::VersionNumber;
-use std::{
-    ffi::{c_char, CStr, CString},
-    os::raw::c_void,
-    ptr,
-};
+use std::{ffi::CString, os::raw::c_void, ptr};
 
 pub trait JVMTI {
     ///
@@ -84,6 +80,13 @@ pub trait JVMTI {
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
     fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
+    fn get_classloader(&self, klass: jclass) -> Result<jobject, NativeError>;
+    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError>;
+    fn get_loaded_classes(&self) -> Result<&[jclass], NativeError>;
+    fn get_class_loader_classes(
+        &self,
+        initiating_loader: jobject,
+    ) -> Result<&[jclass], NativeError>;
 }
 
 pub struct JVMTIEnvironment {
@@ -280,21 +283,22 @@ impl JVMTI for JVMTIEnvironment {
 
     fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError> {
         unsafe {
-            let mut native_sig: MutString = ptr::null_mut();
-            let mut sig: MutString = ptr::null_mut();
-            let p1: *mut MutString = &mut sig;
-            let p2: *mut MutString = &mut native_sig;
+            let mut generic: MutString = ptr::null_mut();
+            let mut signature: MutString = ptr::null_mut();
 
             match wrap_error((**self.jvmti).GetClassSignature.unwrap()(
                 self.jvmti,
                 class_id.native_id,
-                p1,
-                p2,
+                &mut signature,
+                &mut generic,
             )) {
-                NativeError::NoError => Ok(ClassSignature::new(
-                    &JavaType::parse(&stringify(sig)).unwrap(),
-                    stringify(*p1),
-                )),
+                NativeError::NoError => {
+                    let rsignature = stringify(signature);
+                    let x = JavaType::parse(&rsignature.as_str()).unwrap();
+                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, signature as *const u8 as _);
+                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, generic as *const u8 as _);
+                    Ok(ClassSignature::new(&x, rsignature.to_string()))
+                }
                 err @ _ => Err(err),
             }
         }
@@ -541,6 +545,66 @@ impl JVMTI for JVMTIEnvironment {
                 &mut thread,
             )) {
                 NativeError::NoError => Ok(thread),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_classloader(&self, klass: jclass) -> Result<jobject, NativeError> {
+        let mut classloader: jobject = unsafe { std::mem::zeroed() };
+        unsafe {
+            match wrap_error((**self.jvmti).GetClassLoader.unwrap()(
+                self.jvmti,
+                klass,
+                &mut classloader,
+            )) {
+                NativeError::NoError => Ok(classloader),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+        let mut size: jlong = 0;
+        unsafe {
+            match wrap_error((**self.jvmti).GetObjectSize.unwrap()(
+                self.jvmti, object, &mut size,
+            )) {
+                NativeError::NoError => Ok(size),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_loaded_classes(&self) -> Result<&[jclass], NativeError> {
+        let mut count: jint = 0;
+        let mut classes: *mut jclass = std::ptr::null_mut();
+        unsafe {
+            match wrap_error((**self.jvmti).GetLoadedClasses.unwrap()(
+                self.jvmti,
+                &mut count,
+                &mut classes,
+            )) {
+                NativeError::NoError => Ok(std::slice::from_raw_parts(classes, count as usize)),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn get_class_loader_classes(
+        &self,
+        initiating_loader: jobject,
+    ) -> Result<&[jclass], NativeError> {
+        let mut count: jint = 0;
+        let mut classes: *mut jclass = std::ptr::null_mut();
+        unsafe {
+            match wrap_error((**self.jvmti).GetClassLoaderClasses.unwrap()(
+                self.jvmti,
+                initiating_loader,
+                &mut count,
+                &mut classes,
+            )) {
+                NativeError::NoError => Ok(std::slice::from_raw_parts(classes, count as usize)),
                 err @ _ => Err(err),
             }
         }

@@ -1,9 +1,6 @@
 use crate::{
     environment::{jni::JNI, Environment},
-    native::{
-        jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
-        JNIEnvPtr,
-    },
+    native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
 };
 
 use super::capabilities::Capabilities;
@@ -223,6 +220,28 @@ impl JVMTI for JVMEmulator {
     }
 
     fn get_current_thread(&self) -> Result<jthread, NativeError> {
+        todo!()
+    }
+
+    fn get_classloader(
+        &self,
+        klass: crate::native::jvmti_native::jclass,
+    ) -> Result<jobject, NativeError> {
+        todo!()
+    }
+
+    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+        todo!()
+    }
+
+    fn get_loaded_classes(&self) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
+        todo!()
+    }
+
+    fn get_class_loader_classes(
+        &self,
+        initiating_loader: jobject,
+    ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
         todo!()
     }
 }

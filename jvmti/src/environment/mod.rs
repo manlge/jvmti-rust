@@ -188,6 +188,28 @@ impl JVMTI for Environment {
     fn get_current_thread(&self) -> Result<jthread, NativeError> {
         self.jvmti.get_current_thread()
     }
+
+    fn get_classloader(
+        &self,
+        klass: crate::native::jvmti_native::jclass,
+    ) -> Result<jobject, NativeError> {
+        self.jvmti.get_classloader(klass)
+    }
+
+    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+        self.jvmti.get_object_size(object)
+    }
+
+    fn get_loaded_classes(&self) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
+        self.jvmti.get_loaded_classes()
+    }
+
+    fn get_class_loader_classes(
+        &self,
+        initiating_loader: jobject,
+    ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
+        self.jvmti.get_class_loader_classes(initiating_loader)
+    }
 }
 
 impl JNI for Environment {
@@ -253,7 +275,10 @@ impl JNI for Environment {
         self.jni.call_static_object_method(class, method, args)
     }
 
-    fn get_string_utf_chars(&self, str: crate::native::jvmti_native::jstring) -> String {
+    fn get_string_utf_chars(
+        &self,
+        str: crate::native::jvmti_native::jstring,
+    ) -> Result<String, JNIError> {
         self.jni.get_string_utf_chars(str)
     }
 
@@ -273,8 +298,8 @@ impl JNI for Environment {
         self.jni.call_long_method(class, method)
     }
 
-    fn del_local_ref(&self, obj: jobject) {
-        self.jni.del_local_ref(obj)
+    fn delete_local_ref(&self, obj: jobject) {
+        self.jni.delete_local_ref(obj)
     }
 
     fn get_int_field(
@@ -302,7 +327,30 @@ impl JNI for Environment {
         self.jni.get_field_id(class, name, sig)
     }
 
-    fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject {
-        self.jni.call_object_method(object, method)
+    fn call_object_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jobject {
+        self.jni.call_object_method(object, method, args)
+    }
+
+    fn new_global_ref(&self, object: jobject) -> jobject {
+        self.jni.new_global_ref(object)
+    }
+
+    fn delete_global_ref(&self, object: jobject) {
+        self.jni.delete_global_ref(object)
+    }
+
+    fn get_array_length(
+        &self,
+        array: crate::native::jvmti_native::jarray,
+    ) -> crate::native::jvmti_native::jsize {
+        self.jni.get_array_length(array)
+    }
+
+    fn get_object_array_element(
+        &self,
+        array: crate::native::jvmti_native::jobjectArray,
+        index: crate::native::jvmti_native::jsize,
+    ) -> jobject {
+        self.jni.get_object_array_element(array, index)
     }
 }

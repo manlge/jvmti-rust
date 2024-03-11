@@ -626,24 +626,21 @@ unsafe extern "C" fn local_cb_class_file_load_hook(
                 class_name: stringify(name),
                 class_data: raw_data,
             }) {
-                Some(transformed) => {
-                    log::debug!("Transformed class {}", stringify(name));
-
-                    match env.allocate(transformed.len()) {
-                        Ok(allocation) => {
-                            ptr::copy_nonoverlapping(
-                                transformed.as_ptr(),
-                                allocation.ptr,
-                                allocation.len,
-                            );
-                            *new_class_data_len = allocation.len as i32;
-                            *new_class_data = allocation.ptr;
-                        }
-                        Err(err) => {
-                            log::error!("Failed to allocate memory")
-                        }
+                Some(transformed) => match env.allocate(transformed.len()) {
+                    Ok(allocation) => {
+                        log::debug!("Transformed class {}", stringify(name));
+                        ptr::copy_nonoverlapping(
+                            transformed.as_ptr(),
+                            allocation.ptr,
+                            allocation.len,
+                        );
+                        *new_class_data_len = allocation.len as i32;
+                        *new_class_data = allocation.ptr;
                     }
-                }
+                    Err(err) => {
+                        log::error!("Failed to allocate memory")
+                    }
+                },
                 None => (),
             }
 
