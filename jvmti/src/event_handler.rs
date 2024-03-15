@@ -581,7 +581,7 @@ unsafe extern "C" fn local_cb_garbage_collection_finish(jvmti_env: *mut jvmtiEnv
             function();
         }
         None => {
-            println!("No dynamic callback method was found for garbage collection finish events")
+            log::debug!("No dynamic callback method was found for garbage collection finish events")
         }
     }
 }

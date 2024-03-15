@@ -1,13 +1,11 @@
 use crate::native::jvmti_native::jthread;
 
 use super::capabilities::Capabilities;
-use super::config::Config;
 use super::environment::jvm::{JVMAgent, JVMF};
 use super::environment::jvmti::JVMTI;
 use super::error::*;
 use super::event::*;
 use super::native::JavaVMPtr;
-use super::options::Options;
 use super::version::VersionNumber;
 
 pub struct Agent {

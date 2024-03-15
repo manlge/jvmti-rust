@@ -104,6 +104,7 @@ impl Capabilities {
             can_redefine_classes: true,
             can_tag_objects: true,
             can_get_thread_cpu_time: true,
+            can_generate_garbage_collection_events: true,
             ..Default::default()
         }
     }

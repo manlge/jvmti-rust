@@ -210,6 +210,17 @@ impl JVMTI for Environment {
     ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
         self.jvmti.get_class_loader_classes(initiating_loader)
     }
+
+    fn is_array_class(
+        &self,
+        class: crate::native::jvmti_native::jclass,
+    ) -> Result<bool, NativeError> {
+        self.jvmti.is_array_class(class)
+    }
+
+    fn force_garbage_collection(&self) -> Result<(), NativeError> {
+        self.jvmti.force_garbage_collection()
+    }
 }
 
 impl JNI for Environment {
@@ -294,8 +305,9 @@ impl JNI for Environment {
         &self,
         class: crate::native::jvmti_native::jclass,
         method: jmethodID,
+        args: &[jvalue],
     ) -> crate::native::jvmti_native::jlong {
-        self.jni.call_long_method(class, method)
+        self.jni.call_long_method(class, method, args)
     }
 
     fn delete_local_ref(&self, obj: jobject) {

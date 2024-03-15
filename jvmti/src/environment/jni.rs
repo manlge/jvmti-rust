@@ -149,7 +149,7 @@ pub trait JNI {
         method: jmethodID,
         args: &[jvalue],
     ) -> jobject;
-    fn call_long_method(&self, object: jobject, method: jmethodID) -> jlong;
+    fn call_long_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jlong;
     fn call_object_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jobject;
     fn delete_local_ref(&self, obj: jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
@@ -333,8 +333,8 @@ impl JNI for JNIEnvironment {
         }
     }
 
-    fn call_long_method(&self, obj: jobject, method: jmethodID) -> jlong {
-        unsafe { (**self.jni).CallLongMethod.unwrap()(self.jni, obj, method) }
+    fn call_long_method(&self, obj: jobject, method: jmethodID, args: &[jvalue]) -> jlong {
+        unsafe { (**self.jni).CallLongMethodA.unwrap()(self.jni, obj, method, args.as_ptr()) }
     }
 
     fn call_object_method(&self, obj: jobject, method: jmethodID, args: &[jvalue]) -> jobject {

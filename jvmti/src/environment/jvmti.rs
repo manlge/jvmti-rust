@@ -1,7 +1,5 @@
 use crate::native::jvmti_native::*;
 
-use super::super::capabilities::Capabilities;
-use super::super::class::{ClassId, ClassSignature, JavaType};
 use super::super::error::{wrap_error, NativeError};
 use super::super::event::{EventCallbacks, VMEvent};
 use super::super::event_handler::*;
@@ -14,6 +12,11 @@ use super::super::native::{
 use super::super::thread::{Thread, ThreadId};
 use super::super::util::stringify;
 use super::super::version::VersionNumber;
+use super::{super::capabilities::Capabilities, jni::FALSE};
+use super::{
+    super::class::{ClassId, ClassSignature, JavaType},
+    jni::TRUE,
+};
 use std::{ffi::CString, os::raw::c_void, ptr};
 
 pub trait JVMTI {
@@ -87,6 +90,8 @@ pub trait JVMTI {
         &self,
         initiating_loader: jobject,
     ) -> Result<&[jclass], NativeError>;
+    fn is_array_class(&self, class: jclass) -> Result<bool, NativeError>;
+    fn force_garbage_collection(&self) -> Result<(), NativeError>;
 }
 
 pub struct JVMTIEnvironment {
@@ -605,6 +610,29 @@ impl JVMTI for JVMTIEnvironment {
                 &mut classes,
             )) {
                 NativeError::NoError => Ok(std::slice::from_raw_parts(classes, count as usize)),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn is_array_class(&self, class: jclass) -> Result<bool, NativeError> {
+        let mut is_array: jboolean = FALSE;
+        unsafe {
+            match wrap_error((**self.jvmti).IsArrayClass.unwrap()(
+                self.jvmti,
+                class,
+                &mut is_array,
+            )) {
+                NativeError::NoError => Ok(is_array == TRUE),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn force_garbage_collection(&self) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti).ForceGarbageCollection.unwrap()(self.jvmti)) {
+                NativeError::NoError => Ok(()),
                 err @ _ => Err(err),
             }
         }

@@ -244,4 +244,15 @@ impl JVMTI for JVMEmulator {
     ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
         todo!()
     }
+
+    fn is_array_class(
+        &self,
+        class: crate::native::jvmti_native::jclass,
+    ) -> Result<bool, NativeError> {
+        todo!()
+    }
+
+    fn force_garbage_collection(&self) -> Result<(), NativeError> {
+        todo!()
+    }
 }

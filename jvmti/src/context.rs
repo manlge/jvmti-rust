@@ -2,9 +2,9 @@ use super::config::Config;
 use super::thread::ThreadId;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use time::now;
 use time::Duration;
 use time::Tm;
-use time::now;
 
 ///
 /// Public static mutable *cough* agent context. This seems necessary as our code is invoked from
@@ -25,14 +25,14 @@ pub fn static_context() -> &'static AgentContext {
 
 pub struct AgentContext {
     context: Arc<RwLock<Context>>,
-    pub config: Arc<RwLock<Config>>
+    pub config: Arc<RwLock<Config>>,
 }
 
 impl AgentContext {
     pub fn new() -> AgentContext {
         AgentContext {
             context: Arc::new(RwLock::new(Context::new())),
-            config: Arc::new(RwLock::new(Config::default()))
+            config: Arc::new(RwLock::new(Config::default())),
         }
     }
 
@@ -40,7 +40,7 @@ impl AgentContext {
         match self.config.write() {
             Ok(mut cfg) => {
                 *cfg = config;
-            },
+            }
             Err(_) => { /* TODO */ }
         }
     }
@@ -49,7 +49,7 @@ impl AgentContext {
         match self.context.write() {
             Ok(mut ctx) => {
                 (*ctx).thread_lifetime.insert((*thread_id).clone(), now());
-            },
+            }
             Err(_) => { /* TODO: Ignore for now */ }
         }
     }
@@ -59,8 +59,10 @@ impl AgentContext {
             Ok(mut ctx) => {
                 let now = now();
                 Some((*ctx).thread_lifetime.remove(thread_id).unwrap_or(now) - now)
-            },
-            Err(_) => { None /* TODO: Ignore for now */ }
+            }
+            Err(_) => {
+                None /* TODO: Ignore for now */
+            }
         }
     }
 
@@ -68,7 +70,7 @@ impl AgentContext {
         match self.context.write() {
             Ok(mut ctx) => {
                 (*ctx).monitor_queue.insert((*thread_id).clone(), now());
-            },
+            }
             Err(_) => {
                 // TODO: Ignore this
             }
@@ -80,8 +82,10 @@ impl AgentContext {
             Ok(mut ctx) => {
                 let now = now();
                 Some((*ctx).monitor_queue.remove(thread_id).unwrap_or(now) - now)
-            },
-            Err(_) => { None /* TODO: Ignore for now */ }
+            }
+            Err(_) => {
+                None /* TODO: Ignore for now */
+            }
         }
     }
 
@@ -89,7 +93,7 @@ impl AgentContext {
         match self.context.write() {
             Ok(mut ctx) => {
                 (*ctx).thread_wait.insert((*thread_id).clone(), now());
-            },
+            }
             Err(_) => { /* TODO: Ignore for now */ }
         }
     }
@@ -99,8 +103,10 @@ impl AgentContext {
             Ok(mut ctx) => {
                 let now = now();
                 Some((*ctx).thread_wait.remove(thread_id).unwrap_or(now) - now)
-            },
-            Err(_) => { None /* TODO: Ignoring for now */ }
+            }
+            Err(_) => {
+                None /* TODO: Ignoring for now */
+            }
         }
     }
 
@@ -113,15 +119,15 @@ impl AgentContext {
                     Some(mut thread_stack) => {
                         thread_stack.push(now);
                         thread_stack
-                    },
+                    }
                     None => {
-                        let new_vec = vec![ now ];
+                        let new_vec = vec![now];
                         new_vec
                     }
                 };
 
                 (*ctx).method_times.insert((*thread_id).clone(), new_stack);
-            },
+            }
             Err(_) => { /* TODO: Ignoring for now */ }
         }
     }
@@ -134,12 +140,14 @@ impl AgentContext {
                 match (*ctx).method_times.get_mut(thread_id) {
                     Some(ref mut thread_stack) => match thread_stack.pop() {
                         Some(time) => Some(time - now),
-                        None => None
+                        None => None,
                     },
-                    None => None
+                    None => None,
                 }
-            },
-            Err(_) => { None /* TODO Ignoring for now */ }
+            }
+            Err(_) => {
+                None /* TODO Ignoring for now */
+            }
         }
     }
 }
@@ -149,7 +157,7 @@ pub struct Context {
     pub monitor_queue: HashMap<ThreadId, Tm>,
     pub thread_wait: HashMap<ThreadId, Tm>,
     pub method_times: HashMap<ThreadId, Vec<Tm>>,
-    pub method_net_times: HashMap<ThreadId, Vec<Tm>>
+    pub method_net_times: HashMap<ThreadId, Vec<Tm>>,
 }
 
 impl Context {
@@ -159,7 +167,7 @@ impl Context {
             monitor_queue: HashMap::new(),
             thread_wait: HashMap::new(),
             method_times: HashMap::new(),
-            method_net_times: HashMap::new()
+            method_net_times: HashMap::new(),
         }
     }
 }
