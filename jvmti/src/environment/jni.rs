@@ -125,7 +125,7 @@ pub trait JNI {
     /// Return an `ClassId` belonging to the given Java object instance.
     fn get_object_class(&self, object_id: &JavaObject) -> ClassId;
     fn find_class(&self, clazz: &str) -> Result<ClassId, JNIError>;
-    fn get_method(&self, class: &ClassId, name: &str, sig: &str) -> Result<MethodId, JNIError>;
+    fn get_method(&self, class: &jclass, name: &str, sig: &str) -> Result<MethodId, JNIError>;
     fn get_static_method(
         &self,
         class: &ClassId,
@@ -142,7 +142,8 @@ pub trait JNI {
 
     fn is_instance_of(&self, object: jobject, class: jclass) -> bool;
     fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
-    fn call_static_boolean_method(&self, class: jclass, method: jmethodID) -> bool;
+    fn call_static_boolean_method(&self, class: jclass, method: jmethodID, args: &[jvalue])
+        -> bool;
     fn call_static_object_method(
         &self,
         class: jclass,
@@ -150,7 +151,7 @@ pub trait JNI {
         args: &[jvalue],
     ) -> jobject;
     fn call_long_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jlong;
-    fn call_object_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jobject;
+    fn call_object_method(&self, object: jobject, method: &jmethodID, args: &[jvalue]) -> jobject;
     fn delete_local_ref(&self, obj: jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
@@ -198,7 +199,7 @@ impl JNI for JNIEnvironment {
 
     fn get_method(
         &self,
-        class: &ClassId,
+        class: &jclass,
         method_name: &str,
         signature: &str,
     ) -> Result<MethodId, JNIError> {
@@ -206,12 +207,8 @@ impl JNI for JNIEnvironment {
         let sig = CString::new(signature).unwrap();
 
         unsafe {
-            let id: jmethodID = (**self.jni).GetMethodID.unwrap()(
-                self.jni,
-                class.native_id,
-                name.as_ptr(),
-                sig.as_ptr(),
-            );
+            let id: jmethodID =
+                (**self.jni).GetMethodID.unwrap()(self.jni, *class, name.as_ptr(), sig.as_ptr());
             if id.is_null() {
                 Err(JNIError::MethodNotFound(
                     method_name.to_string(),
@@ -297,8 +294,16 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).IsAssignableFrom.unwrap()(self.jni, sub, sup) == 1 }
     }
 
-    fn call_static_boolean_method(&self, class: jclass, method: jmethodID) -> bool {
-        unsafe { (**self.jni).CallStaticBooleanMethod.unwrap()(self.jni, class, method) == 1 }
+    fn call_static_boolean_method(
+        &self,
+        class: jclass,
+        method: jmethodID,
+        args: &[jvalue],
+    ) -> bool {
+        unsafe {
+            (**self.jni).CallStaticBooleanMethodA.unwrap()(self.jni, class, method, args.as_ptr())
+                == 1
+        }
     }
 
     fn call_static_object_method(
@@ -337,8 +342,8 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).CallLongMethodA.unwrap()(self.jni, obj, method, args.as_ptr()) }
     }
 
-    fn call_object_method(&self, obj: jobject, method: jmethodID, args: &[jvalue]) -> jobject {
-        unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, method, args.as_ptr()) }
+    fn call_object_method(&self, obj: jobject, method: &jmethodID, args: &[jvalue]) -> jobject {
+        unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, *method, args.as_ptr()) }
     }
 
     fn delete_local_ref(&self, obj: jobject) {

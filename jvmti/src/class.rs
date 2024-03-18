@@ -1,3 +1,7 @@
+use std::ops::Deref;
+
+use crate::native::jvmti_native::jclass;
+
 use super::native::JavaClass;
 
 ///
@@ -81,6 +85,14 @@ impl<'a> JavaType<'a> {
 ///
 pub struct ClassId {
     pub native_id: JavaClass,
+}
+
+impl Deref for ClassId {
+    type Target = jclass;
+
+    fn deref(&self) -> &Self::Target {
+        &self.native_id
+    }
 }
 
 pub struct ClassSignature {

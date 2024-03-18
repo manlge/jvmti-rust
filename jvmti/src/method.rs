@@ -1,7 +1,19 @@
+use std::ops::Deref;
+
+use crate::native::jvmti_native::jmethodID;
+
 use super::native::JavaMethod;
 
 pub struct MethodId {
     pub native_id: JavaMethod,
+}
+
+impl Deref for MethodId {
+    type Target = jmethodID;
+
+    fn deref(&self) -> &Self::Target {
+        &self.native_id
+    }
 }
 
 pub struct Method {

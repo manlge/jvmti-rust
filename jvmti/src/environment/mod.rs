@@ -1,6 +1,8 @@
 use std::os::raw::c_void;
 
-use crate::native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvalue, jvmtiFrameInfo};
+use crate::native::jvmti_native::{
+    jclass, jlong, jmethodID, jobject, jthread, jvalue, jvmtiFrameInfo,
+};
 
 use self::jni::{JNIEnvironment, JNIError, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
@@ -232,7 +234,7 @@ impl JNI for Environment {
         self.jni.find_class(clazz)
     }
 
-    fn get_method(&self, class: &ClassId, name: &str, sig: &str) -> Result<MethodId, JNIError> {
+    fn get_method(&self, class: &jclass, name: &str, sig: &str) -> Result<MethodId, JNIError> {
         self.jni.get_method(class, name, sig)
     }
 
@@ -252,8 +254,9 @@ impl JNI for Environment {
         &self,
         class: crate::native::jvmti_native::jclass,
         method: crate::native::jvmti_native::jmethodID,
+        args: &[jvalue],
     ) -> bool {
-        self.jni.call_static_boolean_method(class, method)
+        self.jni.call_static_boolean_method(class, method, args)
     }
 
     fn get_static_method(
@@ -339,7 +342,7 @@ impl JNI for Environment {
         self.jni.get_field_id(class, name, sig)
     }
 
-    fn call_object_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jobject {
+    fn call_object_method(&self, object: jobject, method: &jmethodID, args: &[jvalue]) -> jobject {
         self.jni.call_object_method(object, method, args)
     }
 
