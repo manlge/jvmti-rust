@@ -1,4 +1,4 @@
-use std::{ffi::CString, fmt::Display};
+use std::ffi::CString;
 
 use crate::{
     method::MethodId,
@@ -137,8 +137,8 @@ pub trait JNI {
     fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError>;
     fn release_string_utf_chars(&self, str: jstring, chars: *const i8);
     fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject;
-    fn new_global_ref(&self, object: jobject) -> jobject;
-    fn delete_global_ref(&self, object: jobject);
+    fn new_global_ref(&self, object: &jobject) -> jobject;
+    fn delete_global_ref(&self, object: &jobject);
 
     fn is_instance_of(&self, object: jobject, class: jclass) -> bool;
     fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
@@ -152,7 +152,7 @@ pub trait JNI {
     ) -> jobject;
     fn call_long_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jlong;
     fn call_object_method(&self, object: jobject, method: &jmethodID, args: &[jvalue]) -> jobject;
-    fn delete_local_ref(&self, obj: jobject);
+    fn delete_local_ref(&self, obj: &jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
     fn get_array_length(&self, array: jarray) -> jsize;
@@ -346,16 +346,16 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, *method, args.as_ptr()) }
     }
 
-    fn delete_local_ref(&self, obj: jobject) {
-        unsafe { (**self.jni).DeleteLocalRef.unwrap()(self.jni, obj) }
+    fn delete_local_ref(&self, obj: &jobject) {
+        unsafe { (**self.jni).DeleteLocalRef.unwrap()(self.jni, *obj) }
     }
 
-    fn new_global_ref(&self, object: jobject) -> jobject {
-        unsafe { (**self.jni).NewGlobalRef.unwrap()(self.jni, object) }
+    fn new_global_ref(&self, object: &jobject) -> jobject {
+        unsafe { (**self.jni).NewGlobalRef.unwrap()(self.jni, *object) }
     }
 
-    fn delete_global_ref(&self, object: jobject) {
-        unsafe { (**self.jni).DeleteGlobalRef.unwrap()(self.jni, object) }
+    fn delete_global_ref(&self, object: &jobject) {
+        unsafe { (**self.jni).DeleteGlobalRef.unwrap()(self.jni, *object) }
     }
 
     fn get_array_length(&self, array: jarray) -> jsize {

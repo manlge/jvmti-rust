@@ -41,9 +41,9 @@ pub trait JVMTI {
     fn set_event_callbacks(&mut self, callbacks: EventCallbacks) -> Option<NativeError>;
     fn set_event_notification_mode(&mut self, event: VMEvent, mode: bool) -> Option<NativeError>;
     fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError>;
-    fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError>;
+    fn get_method_declaring_class(&self, method_id: &jmethodID) -> Result<ClassId, NativeError>;
     fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError>;
-    fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError>;
+    fn get_class_signature(&self, class: &jclass) -> Result<ClassSignature, NativeError>;
     fn allocate(&self, len: usize) -> Result<MemoryAllocation, NativeError>;
     fn deallocate(&self, mem: *mut u8) -> Result<(), NativeError>;
     fn get_all_threads(&self) -> Result<&[jthread], NativeError>;
@@ -243,7 +243,7 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError> {
+    fn get_method_declaring_class(&self, method: &jmethodID) -> Result<ClassId, NativeError> {
         let mut jstruct: JavaInstance = JavaInstance {
             _hacky_hack_workaround: 0,
         };
@@ -252,9 +252,7 @@ impl JVMTI for JVMTIEnvironment {
 
         unsafe {
             match wrap_error((**self.jvmti).GetMethodDeclaringClass.unwrap()(
-                self.jvmti,
-                method_id.native_id,
-                meta_ptr,
+                self.jvmti, *method, meta_ptr,
             )) {
                 NativeError::NoError => Ok(ClassId {
                     native_id: *meta_ptr,
@@ -286,14 +284,14 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError> {
+    fn get_class_signature(&self, class: &jclass) -> Result<ClassSignature, NativeError> {
         unsafe {
             let mut generic: MutString = ptr::null_mut();
             let mut signature: MutString = ptr::null_mut();
 
             match wrap_error((**self.jvmti).GetClassSignature.unwrap()(
                 self.jvmti,
-                class_id.native_id,
+                *class,
                 &mut signature,
                 &mut generic,
             )) {

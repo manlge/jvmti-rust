@@ -64,7 +64,7 @@ impl JVMTI for Environment {
         self.jvmti.get_thread_info(thread_id)
     }
 
-    fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError> {
+    fn get_method_declaring_class(&self, method_id: &jmethodID) -> Result<ClassId, NativeError> {
         self.jvmti.get_method_declaring_class(method_id)
     }
 
@@ -72,7 +72,7 @@ impl JVMTI for Environment {
         self.jvmti.get_method_name(method_id)
     }
 
-    fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError> {
+    fn get_class_signature(&self, class_id: &jclass) -> Result<ClassSignature, NativeError> {
         self.jvmti.get_class_signature(class_id)
     }
 
@@ -202,7 +202,7 @@ impl JVMTI for Environment {
         self.jvmti.get_object_size(object)
     }
 
-    fn get_loaded_classes(&self) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
+    fn get_loaded_classes(&self) -> Result<&[jclass], NativeError> {
         self.jvmti.get_loaded_classes()
     }
 
@@ -313,7 +313,7 @@ impl JNI for Environment {
         self.jni.call_long_method(class, method, args)
     }
 
-    fn delete_local_ref(&self, obj: jobject) {
+    fn delete_local_ref(&self, obj: &jobject) {
         self.jni.delete_local_ref(obj)
     }
 
@@ -346,11 +346,11 @@ impl JNI for Environment {
         self.jni.call_object_method(object, method, args)
     }
 
-    fn new_global_ref(&self, object: jobject) -> jobject {
+    fn new_global_ref(&self, object: &jobject) -> jobject {
         self.jni.new_global_ref(object)
     }
 
-    fn delete_global_ref(&self, object: jobject) {
+    fn delete_global_ref(&self, object: &jobject) {
         self.jni.delete_global_ref(object)
     }
 
