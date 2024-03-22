@@ -306,10 +306,10 @@ impl JNI for Environment {
 
     fn call_long_method(
         &self,
-        class: crate::native::jvmti_native::jclass,
-        method: jmethodID,
+        class: &jobject,
+        method: &jmethodID,
         args: &[jvalue],
-    ) -> crate::native::jvmti_native::jlong {
+    ) -> Result<jlong, JNIError> {
         self.jni.call_long_method(class, method, args)
     }
 
@@ -342,7 +342,12 @@ impl JNI for Environment {
         self.jni.get_field_id(class, name, sig)
     }
 
-    fn call_object_method(&self, object: jobject, method: &jmethodID, args: &[jvalue]) -> jobject {
+    fn call_object_method(
+        &self,
+        object: &jobject,
+        method: &jmethodID,
+        args: &[jvalue],
+    ) -> Result<jobject, JNIError> {
         self.jni.call_object_method(object, method, args)
     }
 

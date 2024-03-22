@@ -150,8 +150,18 @@ pub trait JNI {
         method: jmethodID,
         args: &[jvalue],
     ) -> jobject;
-    fn call_long_method(&self, object: jobject, method: jmethodID, args: &[jvalue]) -> jlong;
-    fn call_object_method(&self, object: jobject, method: &jmethodID, args: &[jvalue]) -> jobject;
+    fn call_long_method(
+        &self,
+        object: &jobject,
+        method: &jmethodID,
+        args: &[jvalue],
+    ) -> Result<jlong, JNIError>;
+    fn call_object_method(
+        &self,
+        object: &jobject,
+        method: &jmethodID,
+        args: &[jvalue],
+    ) -> Result<jobject, JNIError>;
     fn delete_local_ref(&self, obj: &jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
@@ -341,15 +351,42 @@ impl JNI for JNIEnvironment {
         }
     }
 
-    fn call_long_method(&self, obj: jobject, method: jmethodID, args: &[jvalue]) -> jlong {
-        unsafe { (**self.jni).CallLongMethodA.unwrap()(self.jni, obj, method, args.as_ptr()) }
+    fn call_long_method(
+        &self,
+        object: &jobject,
+        method: &jmethodID,
+        args: &[jvalue],
+    ) -> Result<jlong, JNIError> {
+        if object.is_null() {
+            return Err(JNIError::ObjectIsNull);
+        }
+        unsafe {
+            Ok((**self.jni).CallLongMethodA.unwrap()(
+                self.jni,
+                *object,
+                *method,
+                args.as_ptr(),
+            ))
+        }
     }
 
-    fn call_object_method(&self, obj: jobject, method: &jmethodID, args: &[jvalue]) -> jobject {
-        if obj.is_null() {
-            panic!("obj is null");
+    fn call_object_method(
+        &self,
+        object: &jobject,
+        method: &jmethodID,
+        args: &[jvalue],
+    ) -> Result<jobject, JNIError> {
+        if object.is_null() {
+            return Err(JNIError::ObjectIsNull);
         }
-        unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, *method, args.as_ptr()) }
+        unsafe {
+            Ok((**self.jni).CallObjectMethodA.unwrap()(
+                self.jni,
+                *object,
+                *method,
+                args.as_ptr(),
+            ))
+        }
     }
 
     fn delete_local_ref(&self, obj: &jobject) {
