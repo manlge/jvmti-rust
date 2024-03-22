@@ -20,6 +20,7 @@ pub enum JNIError {
     MethodNotFound(String, String),
     FieldNotFound(String),
     ObjectIsNull,
+    ClassObjectIsNull,
 }
 
 impl From<jint> for jvalue {
@@ -141,7 +142,7 @@ pub trait JNI {
     fn delete_global_ref(&self, object: &jobject) -> Result<(), JNIError>;
 
     fn is_instance_of(&self, object: jobject, class: jclass) -> bool;
-    fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
+    fn is_assignable_from(&self, sub: &jclass, sup: &jclass) -> Result<bool, JNIError>;
     fn call_static_boolean_method(&self, class: jclass, method: jmethodID, args: &[jvalue])
         -> bool;
     fn call_static_object_method(
@@ -303,8 +304,16 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).IsInstanceOf.unwrap()(self.jni, object, class) == 1 }
     }
 
-    fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool {
-        unsafe { (**self.jni).IsAssignableFrom.unwrap()(self.jni, sub, sup) == 1 }
+    fn is_assignable_from(&self, sub: &jclass, sup: &jclass) -> Result<bool, JNIError> {
+        if sup.is_null() {
+            return Err(JNIError::ClassObjectIsNull);
+        }
+
+        if sub.is_null() {
+            return Err(JNIError::ClassObjectIsNull);
+        }
+
+        unsafe { Ok((**self.jni).IsAssignableFrom.unwrap()(self.jni, *sub, *sup) == 1) }
     }
 
     fn call_static_boolean_method(

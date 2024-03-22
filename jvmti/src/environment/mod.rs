@@ -1,8 +1,6 @@
 use std::os::raw::c_void;
 
-use crate::native::jvmti_native::{
-    jarray, jclass, jlong, jmethodID, jobject, jsize, jthread, jvalue, jvmtiFrameInfo,
-};
+use crate::native::jvmti_native::*;
 
 use self::jni::{JNIEnvironment, JNIError, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
@@ -272,35 +270,24 @@ impl JNI for Environment {
         self.jni.new_string_utf(str)
     }
 
-    fn is_assignable_from(
-        &self,
-        sub: crate::native::jvmti_native::jclass,
-        sup: crate::native::jvmti_native::jclass,
-    ) -> bool {
+    fn is_assignable_from(&self, sub: &jclass, sup: &jclass) -> Result<bool, JNIError> {
         self.jni.is_assignable_from(sub, sup)
     }
 
     fn call_static_object_method(
         &self,
-        class: crate::native::jvmti_native::jclass,
+        class: jclass,
         method: jmethodID,
         args: &[jvalue],
     ) -> jobject {
         self.jni.call_static_object_method(class, method, args)
     }
 
-    fn get_string_utf_chars(
-        &self,
-        str: crate::native::jvmti_native::jstring,
-    ) -> Result<String, JNIError> {
+    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError> {
         self.jni.get_string_utf_chars(str)
     }
 
-    fn release_string_utf_chars(
-        &self,
-        str: crate::native::jvmti_native::jstring,
-        chars: *const i8,
-    ) {
+    fn release_string_utf_chars(&self, str: jstring, chars: *const i8) {
         self.jni.release_string_utf_chars(str, chars)
     }
 
@@ -317,28 +304,15 @@ impl JNI for Environment {
         self.jni.delete_local_ref(obj)
     }
 
-    fn get_int_field(
-        &self,
-        obj: jobject,
-        field: crate::native::jvmti_native::jfieldID,
-    ) -> crate::native::jvmti_native::jint {
+    fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint {
         self.jni.get_int_field(obj, field)
     }
 
-    fn get_object_field(
-        &self,
-        obj: jobject,
-        field: crate::native::jvmti_native::jfieldID,
-    ) -> jobject {
+    fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject {
         self.jni.get_object_field(obj, field)
     }
 
-    fn get_field_id(
-        &self,
-        class: crate::native::jvmti_native::jclass,
-        name: &str,
-        sig: &str,
-    ) -> crate::native::jvmti_native::jfieldID {
+    fn get_field_id(&self, class: jclass, name: &str, sig: &str) -> jfieldID {
         self.jni.get_field_id(class, name, sig)
     }
 
@@ -363,11 +337,7 @@ impl JNI for Environment {
         self.jni.get_array_length(array)
     }
 
-    fn get_object_array_element(
-        &self,
-        array: crate::native::jvmti_native::jobjectArray,
-        index: crate::native::jvmti_native::jsize,
-    ) -> jobject {
+    fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject {
         self.jni.get_object_array_element(array, index)
     }
 }

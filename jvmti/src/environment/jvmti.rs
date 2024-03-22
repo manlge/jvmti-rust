@@ -212,17 +212,21 @@ impl JVMTI for JVMTIEnvironment {
         unsafe {
             match (**self.jvmti).GetThreadInfo {
                 Some(func) => match wrap_error(func(self.jvmti, *thread_id, info_ptr)) {
-                    NativeError::NoError => Ok(Thread {
-                        id: ThreadId {
-                            native_id: *thread_id,
-                        },
-                        name: stringify((*info_ptr).name),
-                        priority: (*info_ptr).priority as u32,
-                        is_daemon: if (*info_ptr).is_daemon > 0 {
-                            true
-                        } else {
-                            false
-                        },
+                    NativeError::NoError => Ok({
+                        let thread = Thread {
+                            id: ThreadId {
+                                native_id: *thread_id,
+                            },
+                            name: stringify((*info_ptr).name),
+                            priority: (*info_ptr).priority as u32,
+                            is_daemon: if (*info_ptr).is_daemon > 0 {
+                                true
+                            } else {
+                                false
+                            },
+                        };
+                        //todo free name array
+                        thread
                     }),
                     err @ _ => Err(err),
                 },
