@@ -1,7 +1,7 @@
 use std::os::raw::c_void;
 
 use crate::native::jvmti_native::{
-    jclass, jlong, jmethodID, jobject, jthread, jvalue, jvmtiFrameInfo,
+    jarray, jclass, jlong, jmethodID, jobject, jsize, jthread, jvalue, jvmtiFrameInfo,
 };
 
 use self::jni::{JNIEnvironment, JNIError, JNI};
@@ -350,14 +350,11 @@ impl JNI for Environment {
         self.jni.new_global_ref(object)
     }
 
-    fn delete_global_ref(&self, object: &jobject) {
+    fn delete_global_ref(&self, object: &jobject) -> Result<(), JNIError> {
         self.jni.delete_global_ref(object)
     }
 
-    fn get_array_length(
-        &self,
-        array: crate::native::jvmti_native::jarray,
-    ) -> crate::native::jvmti_native::jsize {
+    fn get_array_length(&self, array: &jarray) -> Result<jsize, JNIError> {
         self.jni.get_array_length(array)
     }
 

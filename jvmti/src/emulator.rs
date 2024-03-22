@@ -1,6 +1,6 @@
 use crate::{
     environment::{jni::JNI, Environment},
-    native::jvmti_native::{jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
+    native::jvmti_native::{jclass, jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
 };
 
 use super::capabilities::Capabilities;
@@ -10,7 +10,7 @@ use super::environment::jvmti::JVMTI;
 use super::error::NativeError;
 use super::event::{EventCallbacks, VMEvent};
 use super::mem::MemoryAllocation;
-use super::method::{MethodId, MethodSignature};
+use super::method::MethodSignature;
 use super::native::JavaThread;
 use super::runtime::*;
 use super::thread::Thread;
@@ -92,8 +92,8 @@ impl JVMTI for JVMEmulator {
         }
     }
 
-    fn get_method_declaring_class(&self, method_id: &MethodId) -> Result<ClassId, NativeError> {
-        match method_id.native_id as u64 {
+    fn get_method_declaring_class(&self, method_id: &jmethodID) -> Result<ClassId, NativeError> {
+        match *method_id as u64 {
             _ => Err(NativeError::NotImplemented),
         }
     }
@@ -105,8 +105,8 @@ impl JVMTI for JVMEmulator {
         }
     }
 
-    fn get_class_signature(&self, class_id: &ClassId) -> Result<ClassSignature, NativeError> {
-        match class_id.native_id as u64 {
+    fn get_class_signature(&self, class_id: &jclass) -> Result<ClassSignature, NativeError> {
+        match *class_id as u64 {
             _ => Err(NativeError::NotImplemented),
         }
     }

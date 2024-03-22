@@ -138,7 +138,7 @@ pub trait JNI {
     fn release_string_utf_chars(&self, str: jstring, chars: *const i8);
     fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject;
     fn new_global_ref(&self, object: &jobject) -> jobject;
-    fn delete_global_ref(&self, object: &jobject);
+    fn delete_global_ref(&self, object: &jobject) -> Result<(), JNIError>;
 
     fn is_instance_of(&self, object: jobject, class: jclass) -> bool;
     fn is_assignable_from(&self, sub: jclass, sup: jclass) -> bool;
@@ -155,7 +155,7 @@ pub trait JNI {
     fn delete_local_ref(&self, obj: &jobject);
     fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint;
     fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject;
-    fn get_array_length(&self, array: jarray) -> jsize;
+    fn get_array_length(&self, array: &jarray) -> Result<jsize, JNIError>;
     fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject;
 }
 
@@ -203,6 +203,9 @@ impl JNI for JNIEnvironment {
         method_name: &str,
         signature: &str,
     ) -> Result<MethodId, JNIError> {
+        if class.is_null() {
+            return Err(JNIError::ObjectIsNull);
+        }
         let name = CString::new(method_name).unwrap();
         let sig = CString::new(signature).unwrap();
 
@@ -343,6 +346,9 @@ impl JNI for JNIEnvironment {
     }
 
     fn call_object_method(&self, obj: jobject, method: &jmethodID, args: &[jvalue]) -> jobject {
+        if obj.is_null() {
+            panic!("obj is null");
+        }
         unsafe { (**self.jni).CallObjectMethodA.unwrap()(self.jni, obj, *method, args.as_ptr()) }
     }
 
@@ -354,12 +360,19 @@ impl JNI for JNIEnvironment {
         unsafe { (**self.jni).NewGlobalRef.unwrap()(self.jni, *object) }
     }
 
-    fn delete_global_ref(&self, object: &jobject) {
-        unsafe { (**self.jni).DeleteGlobalRef.unwrap()(self.jni, *object) }
+    fn delete_global_ref(&self, object: &jobject) -> Result<(), JNIError> {
+        if object.is_null() {
+            return Err(JNIError::ObjectIsNull);
+        }
+
+        unsafe { Ok((**self.jni).DeleteGlobalRef.unwrap()(self.jni, *object)) }
     }
 
-    fn get_array_length(&self, array: jarray) -> jsize {
-        unsafe { (**self.jni).GetArrayLength.unwrap()(self.jni, array) }
+    fn get_array_length(&self, array: &jarray) -> Result<jsize, JNIError> {
+        if array.is_null() {
+            return Err(JNIError::ObjectIsNull);
+        }
+        unsafe { Ok((**self.jni).GetArrayLength.unwrap()(self.jni, *array)) }
     }
 
     fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject {
