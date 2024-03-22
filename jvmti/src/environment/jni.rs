@@ -135,7 +135,7 @@ pub trait JNI {
     ) -> Result<MethodId, JNIError>;
     fn get_field_id(&self, class: jclass, name: &str, sig: &str) -> jfieldID;
     fn new_string_utf(&self, str: &str) -> jstring;
-    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError>;
+    fn get_string_utf_chars(&self, string: &jstring) -> Result<String, JNIError>;
     fn release_string_utf_chars(&self, str: jstring, chars: *const i8);
     fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject;
     fn new_global_ref(&self, object: &jobject) -> jobject;
@@ -339,16 +339,16 @@ impl JNI for JNIEnvironment {
         }
     }
 
-    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError> {
-        if str.is_null() {
+    fn get_string_utf_chars(&self, string: &jstring) -> Result<String, JNIError> {
+        if string.is_null() {
             return Err(JNIError::ObjectIsNull);
         }
         let mut is_copy: jboolean = FALSE;
         unsafe {
-            let chars = (**self.jni).GetStringUTFChars.unwrap()(self.jni, str, &mut is_copy);
+            let chars = (**self.jni).GetStringUTFChars.unwrap()(self.jni, *string, &mut is_copy);
             let ret = stringify(chars);
             if !chars.is_null() {
-                self.release_string_utf_chars(str, chars);
+                self.release_string_utf_chars(*string, chars);
             }
             Ok(ret)
         }

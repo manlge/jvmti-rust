@@ -283,8 +283,8 @@ impl JNI for Environment {
         self.jni.call_static_object_method(class, method, args)
     }
 
-    fn get_string_utf_chars(&self, str: jstring) -> Result<String, JNIError> {
-        self.jni.get_string_utf_chars(str)
+    fn get_string_utf_chars(&self, string: &jstring) -> Result<String, JNIError> {
+        self.jni.get_string_utf_chars(string)
     }
 
     fn release_string_utf_chars(&self, str: jstring, chars: *const i8) {
