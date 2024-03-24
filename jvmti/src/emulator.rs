@@ -223,14 +223,11 @@ impl JVMTI for JVMEmulator {
         todo!()
     }
 
-    fn get_classloader(
-        &self,
-        klass: crate::native::jvmti_native::jclass,
-    ) -> Result<jobject, NativeError> {
+    fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError> {
         todo!()
     }
 
-    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+    fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError> {
         todo!()
     }
 
@@ -240,7 +237,7 @@ impl JVMTI for JVMEmulator {
 
     fn get_class_loader_classes(
         &self,
-        initiating_loader: jobject,
+        initiating_loader: &jobject,
     ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
         todo!()
     }

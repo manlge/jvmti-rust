@@ -1,11 +1,13 @@
-use super::class::{ClassId, ClassSignature};
+use crate::native::JavaClass;
+
+use super::class::ClassSignature;
 use super::method::{MethodId, MethodSignature};
 use super::thread::Thread;
 
 pub trait RuntimeEvent {}
 
 pub struct ObjectAllocationEvent {
-    pub class_id: ClassId,
+    pub class_id: JavaClass,
     pub thread: Thread,
     pub size: i64,
 }

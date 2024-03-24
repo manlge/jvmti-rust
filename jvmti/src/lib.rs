@@ -6,20 +6,6 @@ extern crate toml;
 #[macro_use]
 extern crate serde_derive;
 
-use agent::Agent;
-use bytecode::classfile::Constant;
-use bytecode::io::ClassWriter;
-use bytecode::printer::ClassfilePrinter;
-use config::Config;
-use context::static_context;
-use instrumentation::asm::transformer::Transformer;
-use native::{jvmti_native::jobject, JVMTIEnvPtr, JavaVMPtr, MutString, ReturnValue, VoidPtr};
-use options::Options;
-use runtime::*;
-use std::io::Cursor;
-use thread::Thread;
-use util::stringify;
-
 pub mod agent;
 pub mod bytecode;
 pub mod capabilities;

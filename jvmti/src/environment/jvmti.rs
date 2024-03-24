@@ -4,7 +4,7 @@ use super::super::error::{wrap_error, NativeError};
 use super::super::event::{EventCallbacks, VMEvent};
 use super::super::event_handler::*;
 use super::super::mem::MemoryAllocation;
-use super::super::method::{MethodId, MethodSignature};
+use super::super::method::MethodSignature;
 use super::super::native::jvmti_native::{jvmtiCapabilities, Struct__jvmtiThreadInfo};
 use super::super::native::{
     JVMTIEnvPtr, JavaClass, JavaInstance, JavaLong, JavaObject, JavaThread, MutByteArray, MutString,
@@ -83,12 +83,12 @@ pub trait JVMTI {
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
     fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
-    fn get_classloader(&self, klass: jclass) -> Result<jobject, NativeError>;
-    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError>;
+    fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError>;
+    fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError>;
     fn get_loaded_classes(&self) -> Result<&[jclass], NativeError>;
     fn get_class_loader_classes(
         &self,
-        initiating_loader: jobject,
+        initiating_loader: &jobject,
     ) -> Result<&[jclass], NativeError>;
     fn is_array_class(&self, class: jclass) -> Result<bool, NativeError>;
     fn force_garbage_collection(&self) -> Result<(), NativeError>;
@@ -557,12 +557,12 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_classloader(&self, klass: jclass) -> Result<jobject, NativeError> {
+    fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError> {
         let mut classloader: jobject = unsafe { std::mem::zeroed() };
         unsafe {
             match wrap_error((**self.jvmti).GetClassLoader.unwrap()(
                 self.jvmti,
-                klass,
+                *klass,
                 &mut classloader,
             )) {
                 NativeError::NoError => Ok(classloader),
@@ -571,11 +571,11 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+    fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError> {
         let mut size: jlong = 0;
         unsafe {
             match wrap_error((**self.jvmti).GetObjectSize.unwrap()(
-                self.jvmti, object, &mut size,
+                self.jvmti, *object, &mut size,
             )) {
                 NativeError::NoError => Ok(size),
                 err @ _ => Err(err),
@@ -600,14 +600,14 @@ impl JVMTI for JVMTIEnvironment {
 
     fn get_class_loader_classes(
         &self,
-        initiating_loader: jobject,
+        initiating_loader: &jobject,
     ) -> Result<&[jclass], NativeError> {
         let mut count: jint = 0;
         let mut classes: *mut jclass = std::ptr::null_mut();
         unsafe {
             match wrap_error((**self.jvmti).GetClassLoaderClasses.unwrap()(
                 self.jvmti,
-                initiating_loader,
+                *initiating_loader,
                 &mut count,
                 &mut classes,
             )) {

@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use crate::native::jvmti_native::*;
+use crate::native::{jvmti_native::*, JavaClass, JavaMethod, JavaObjectArray};
 
 use self::jni::{JNIEnvironment, JNIError, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
@@ -62,11 +62,11 @@ impl JVMTI for Environment {
         self.jvmti.get_thread_info(thread_id)
     }
 
-    fn get_method_declaring_class(&self, method_id: &jmethodID) -> Result<ClassId, NativeError> {
+    fn get_method_declaring_class(&self, method_id: &JavaMethod) -> Result<ClassId, NativeError> {
         self.jvmti.get_method_declaring_class(method_id)
     }
 
-    fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError> {
+    fn get_method_name(&self, method_id: JavaMethod) -> Result<MethodSignature, NativeError> {
         self.jvmti.get_method_name(method_id)
     }
 
@@ -108,7 +108,7 @@ impl JVMTI for Environment {
         thread: crate::native::jvmti_native::jthread,
         depth: crate::native::jvmti_native::jint,
         slot: crate::native::jvmti_native::jint,
-    ) -> Result<jobject, NativeError> {
+    ) -> Result<JavaObject, NativeError> {
         self.jvmti.get_local_object(thread, depth, slot)
     }
 
@@ -171,7 +171,7 @@ impl JVMTI for Environment {
         )
     }
 
-    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
         self.jvmti.get_object_with_tag(tags_list)
     }
 
@@ -189,14 +189,11 @@ impl JVMTI for Environment {
         self.jvmti.get_current_thread()
     }
 
-    fn get_classloader(
-        &self,
-        klass: crate::native::jvmti_native::jclass,
-    ) -> Result<jobject, NativeError> {
+    fn get_classloader(&self, klass: &jclass) -> Result<JavaObject, NativeError> {
         self.jvmti.get_classloader(klass)
     }
 
-    fn get_object_size(&self, object: jobject) -> Result<jlong, NativeError> {
+    fn get_object_size(&self, object: &JavaObject) -> Result<jlong, NativeError> {
         self.jvmti.get_object_size(object)
     }
 
@@ -206,7 +203,7 @@ impl JVMTI for Environment {
 
     fn get_class_loader_classes(
         &self,
-        initiating_loader: jobject,
+        initiating_loader: &JavaObject,
     ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
         self.jvmti.get_class_loader_classes(initiating_loader)
     }
@@ -224,7 +221,7 @@ impl JVMTI for Environment {
 }
 
 impl JNI for Environment {
-    fn get_object_class(&self, object_id: &JavaObject) -> ClassId {
+    fn get_object_class(&self, object_id: &JavaObject) -> Result<JavaClass, JNIError> {
         self.jni.get_object_class(object_id)
     }
 
@@ -236,24 +233,25 @@ impl JNI for Environment {
         self.jni.get_method(class, name, sig)
     }
 
-    fn new_object(&self, class: &ClassId, method: &MethodId, args: &[jvalue]) -> JavaObject {
+    fn new_object(
+        &self,
+        class: &jclass,
+        method: &JavaMethod,
+        args: &[jvalue],
+    ) -> Result<JavaObject, JNIError> {
         self.jni.new_object(class, method, args)
     }
 
-    fn is_instance_of(
-        &self,
-        object: crate::native::jvmti_native::jobject,
-        class: crate::native::jvmti_native::jclass,
-    ) -> bool {
+    fn is_instance_of(&self, object: &JavaObject, class: &jclass) -> Result<bool, JNIError> {
         self.jni.is_instance_of(object, class)
     }
 
     fn call_static_boolean_method(
         &self,
-        class: crate::native::jvmti_native::jclass,
-        method: crate::native::jvmti_native::jmethodID,
+        class: &jclass,
+        method: &JavaMethod,
         args: &[jvalue],
-    ) -> bool {
+    ) -> Result<bool, JNIError> {
         self.jni.call_static_boolean_method(class, method, args)
     }
 
@@ -266,7 +264,7 @@ impl JNI for Environment {
         self.jni.get_static_method(class, name, sig)
     }
 
-    fn new_string_utf(&self, str: &str) -> crate::native::jvmti_native::jstring {
+    fn new_string_utf(&self, str: &str) -> Result<jstring, JNIError> {
         self.jni.new_string_utf(str)
     }
 
@@ -276,10 +274,10 @@ impl JNI for Environment {
 
     fn call_static_object_method(
         &self,
-        class: jclass,
-        method: jmethodID,
+        class: &jclass,
+        method: &JavaMethod,
         args: &[jvalue],
-    ) -> jobject {
+    ) -> Result<JavaObject, JNIError> {
         self.jni.call_static_object_method(class, method, args)
     }
 
@@ -287,49 +285,49 @@ impl JNI for Environment {
         self.jni.get_string_utf_chars(string)
     }
 
-    fn release_string_utf_chars(&self, str: jstring, chars: *const i8) {
+    fn release_string_utf_chars(&self, str: &jstring, chars: *const i8) -> Result<(), JNIError> {
         self.jni.release_string_utf_chars(str, chars)
     }
 
     fn call_long_method(
         &self,
-        class: &jobject,
-        method: &jmethodID,
+        class: &JavaObject,
+        method: &JavaMethod,
         args: &[jvalue],
     ) -> Result<jlong, JNIError> {
         self.jni.call_long_method(class, method, args)
     }
 
-    fn delete_local_ref(&self, obj: &jobject) {
+    fn delete_local_ref(&self, obj: &JavaObject) -> Result<(), JNIError> {
         self.jni.delete_local_ref(obj)
     }
 
-    fn get_int_field(&self, obj: jobject, field: jfieldID) -> jint {
+    fn get_int_field(&self, obj: &JavaObject, field: &jfieldID) -> Result<jint, JNIError> {
         self.jni.get_int_field(obj, field)
     }
 
-    fn get_object_field(&self, obj: jobject, field: jfieldID) -> jobject {
+    fn get_object_field(&self, obj: &JavaObject, field: &jfieldID) -> Result<JavaObject, JNIError> {
         self.jni.get_object_field(obj, field)
     }
 
-    fn get_field_id(&self, class: jclass, name: &str, sig: &str) -> jfieldID {
+    fn get_field_id(&self, class: &jclass, name: &str, sig: &str) -> Result<jfieldID, JNIError> {
         self.jni.get_field_id(class, name, sig)
     }
 
     fn call_object_method(
         &self,
-        object: &jobject,
-        method: &jmethodID,
+        object: &JavaObject,
+        method: &JavaMethod,
         args: &[jvalue],
-    ) -> Result<jobject, JNIError> {
+    ) -> Result<JavaObject, JNIError> {
         self.jni.call_object_method(object, method, args)
     }
 
-    fn new_global_ref(&self, object: &jobject) -> jobject {
+    fn new_global_ref(&self, object: &JavaObject) -> Result<JavaObject, JNIError> {
         self.jni.new_global_ref(object)
     }
 
-    fn delete_global_ref(&self, object: &jobject) -> Result<(), JNIError> {
+    fn delete_global_ref(&self, object: &JavaObject) -> Result<(), JNIError> {
         self.jni.delete_global_ref(object)
     }
 
@@ -337,7 +335,11 @@ impl JNI for Environment {
         self.jni.get_array_length(array)
     }
 
-    fn get_object_array_element(&self, array: jobjectArray, index: jsize) -> jobject {
+    fn get_object_array_element(
+        &self,
+        array: &JavaObjectArray,
+        index: jsize,
+    ) -> Result<JavaObject, JNIError> {
         self.jni.get_object_array_element(array, index)
     }
 }

@@ -235,7 +235,7 @@ unsafe extern "C" fn local_cb_vm_object_alloc(
             );
             match env.get_thread_info(&thread) {
                 Ok(current_thread) => {
-                    let class_id = env.get_object_class(&object);
+                    let class_id = env.get_object_class(&object).unwrap();
 
                     function(ObjectAllocationEvent {
                         class_id: class_id,
