@@ -1,3 +1,7 @@
+const JVMTI_ERROR_INVALID_MONITOR: u32 = 50;
+const JVMTI_ERROR_NOT_MONITOR_OWNER: u32 = 51;
+const JVMTI_ERROR_ILLEGAL_ARGUMENT: u32 = 103;
+
 /// A type-safe representation of possible errors
 #[derive(Debug)]
 pub enum NativeError {
@@ -13,6 +17,9 @@ pub enum NativeError {
     NotImplemented = 999999, // <- now this is a "temporary" hack until the library is under heavy development
     UnknownError,
     ThreadNotAlive = 15,
+    InvalidMonitor = JVMTI_ERROR_INVALID_MONITOR as isize,
+    NotMonitorOwner = JVMTI_ERROR_NOT_MONITOR_OWNER as isize,
+    IllegalArgument = JVMTI_ERROR_ILLEGAL_ARGUMENT as isize,
 }
 
 /// Turn a native error code into a type-safe error
@@ -29,8 +36,10 @@ pub fn wrap_error(code: u32) -> NativeError {
         116 => NativeError::Disconnected,
         999999 => NativeError::NotImplemented,
         15 => NativeError::ThreadNotAlive,
+        JVMTI_ERROR_INVALID_MONITOR => NativeError::InvalidMonitor,
+        JVMTI_ERROR_NOT_MONITOR_OWNER => NativeError::NotMonitorOwner,
         _ => {
-            println!("Unknown error code was detected: {}", code);
+            eprintln!("Unknown error code was detected: {}", code);
             NativeError::UnknownError
         }
     }
@@ -57,5 +66,9 @@ pub fn translate_error(code: &NativeError) -> String {
         &NativeError::NotImplemented => "This function is not implemented yet",
         &NativeError::UnknownError => "Unknown error.",
         &NativeError::ThreadNotAlive => "thread is not live (has not been started or is now dead).",
+        &NativeError::InvalidMonitor => "Invalid raw monitor.",
+        &NativeError::NotMonitorOwner => "This thread doesn't own the raw monitor.",
+        &NativeError::IllegalArgument => "Illegal argument.",
+
     }.to_string()
 }

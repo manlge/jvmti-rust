@@ -1,6 +1,8 @@
 use crate::{
     environment::{jni::JNI, Environment},
-    native::jvmti_native::{jclass, jlong, jmethodID, jobject, jthread, jvmtiFrameInfo},
+    native::jvmti_native::{
+        jclass, jlong, jmethodID, jobject, jthread, jvmtiFrameInfo, jvmtiThreadInfo,
+    },
 };
 
 use super::capabilities::Capabilities;
@@ -13,7 +15,6 @@ use super::mem::MemoryAllocation;
 use super::method::MethodSignature;
 use super::native::JavaThread;
 use super::runtime::*;
-use super::thread::Thread;
 use super::version::VersionNumber;
 use std::collections::HashMap;
 
@@ -55,6 +56,10 @@ impl JVMF for JVMEmulator {
     fn attach_current_thread(&self, thread_name: &str) -> Result<Box<dyn JNI>, NativeError> {
         unimplemented!()
     }
+
+    fn get_jni_environment(&self) -> Result<Box<dyn JNI>, NativeError> {
+        todo!()
+    }
 }
 
 impl JVMTI for JVMEmulator {
@@ -77,7 +82,6 @@ impl JVMTI for JVMEmulator {
 
     fn set_event_callbacks(&mut self, callbacks: EventCallbacks) -> Option<NativeError> {
         self.callbacks = callbacks;
-
         None
     }
 
@@ -86,7 +90,7 @@ impl JVMTI for JVMEmulator {
         None
     }
 
-    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError> {
+    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<jvmtiThreadInfo, NativeError> {
         match *thread_id as u64 {
             _ => Err(NativeError::NotImplemented),
         }

@@ -234,13 +234,14 @@ unsafe extern "C" fn local_cb_vm_object_alloc(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => {
+                Ok(thread_info) => {
                     let class_id = env.get_object_class(&object).unwrap();
+                    let thread = thread_info.into_thread(&env, thread);
 
                     function(ObjectAllocationEvent {
                         class_id: class_id,
                         size: size as i64,
-                        thread: current_thread,
+                        thread: thread,
                     })
                 }
                 Err(err) => {
@@ -270,19 +271,19 @@ unsafe extern "C" fn local_cb_method_entry(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => {
+                Ok(thread_info) => {
                     let method_id = MethodId { native_id: method };
                     let class_id = env.get_method_declaring_class(&method_id).ok().unwrap();
                     let class_sig = env.get_class_signature(&class_id).ok().unwrap();
                     let method_sig = env.get_method_name(method_id.native_id).ok().unwrap();
-
+                    let new_thread = thread_info.into_thread(&env, thread);
                     function(
                         env,
                         MethodInvocationEvent {
                             method_id: method_id,
                             method_sig: method_sig,
                             class_sig: class_sig,
-                            thread: current_thread,
+                            thread: new_thread,
                         },
                     )
                 }
@@ -315,12 +316,12 @@ unsafe extern "C" fn local_cb_method_exit(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => {
+                Ok(thread_info) => {
                     let method_id = MethodId { native_id: method };
                     let class_id = env.get_method_declaring_class(&method_id).ok().unwrap();
                     let class_sig = env.get_class_signature(&class_id).ok().unwrap();
                     let method_sig = env.get_method_name(method_id.native_id).ok().unwrap();
-
+                    let new_thread = thread_info.into_thread(&env, thread);
                     function(
                         env,
                         thread,
@@ -328,7 +329,7 @@ unsafe extern "C" fn local_cb_method_exit(
                             method_id: method_id,
                             method_sig: method_sig,
                             class_sig: class_sig,
-                            thread: current_thread,
+                            thread: new_thread,
                         },
                         &return_value,
                     )
@@ -410,7 +411,7 @@ unsafe extern "C" fn local_cb_monitor_wait(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* we're in the wrong phase, just ignore this */
@@ -439,7 +440,7 @@ unsafe extern "C" fn local_cb_monitor_waited(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* we're in the wrong phase, just ignore this */
@@ -467,7 +468,7 @@ unsafe extern "C" fn local_cb_monitor_contended_enter(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* we're in the wrong phase, just ignore this */
@@ -495,7 +496,7 @@ unsafe extern "C" fn local_cb_monitor_contended_entered(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* we're in the wrong phase, just ignore this */
@@ -522,7 +523,7 @@ unsafe extern "C" fn local_cb_thread_start(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* we're in the wrong phase, just ignore this */
@@ -549,7 +550,7 @@ unsafe extern "C" fn local_cb_thread_end(
                 JNIEnvironment::new(jni_env),
             );
             match env.get_thread_info(&thread) {
-                Ok(current_thread) => function(current_thread),
+                Ok(thread_info) => function(thread_info.into_thread(&env, thread)),
                 Err(err) => {
                     match err {
                         NativeError::NotAvailable => { /* wrong phase, just ignore this */ }

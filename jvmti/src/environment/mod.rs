@@ -11,7 +11,6 @@ use super::event::{EventCallbacks, VMEvent};
 use super::mem::MemoryAllocation;
 use super::method::{MethodId, MethodSignature};
 use super::native::JavaObject;
-use super::thread::Thread;
 use super::version::VersionNumber;
 
 pub mod jni;
@@ -21,12 +20,19 @@ pub mod jvmti;
 /// `Environment` combines the functionality of both `JNI` and `JVMTI` by wrapping an instance of
 /// both and delegating the method calls to their corresponding recipients.
 pub struct Environment {
-    jvmti: JVMTIEnvironment,
-    jni: JNIEnvironment,
+    jvmti: Box<dyn JVMTI>,
+    jni: Box<dyn JNI>,
 }
 
 impl Environment {
     pub fn new(jvmti: JVMTIEnvironment, jni: JNIEnvironment) -> Environment {
+        Environment {
+            jvmti: Box::new(jvmti),
+            jni: Box::new(jni),
+        }
+    }
+
+    pub fn with_boxed(jvmti: Box<dyn JVMTI>, jni: Box<dyn JNI>) -> Environment {
         Environment {
             jvmti: jvmti,
             jni: jni,
@@ -58,7 +64,7 @@ impl JVMTI for Environment {
         self.jvmti.set_event_notification_mode(event, mode)
     }
 
-    fn get_thread_info(&self, thread_id: &jthread) -> Result<Thread, NativeError> {
+    fn get_thread_info(&self, thread_id: &jthread) -> Result<jvmtiThreadInfo, NativeError> {
         self.jvmti.get_thread_info(thread_id)
     }
 
@@ -257,7 +263,7 @@ impl JNI for Environment {
 
     fn get_static_method(
         &self,
-        class: &ClassId,
+        class: &JavaClass,
         name: &str,
         sig: &str,
     ) -> Result<MethodId, JNIError> {
@@ -298,8 +304,8 @@ impl JNI for Environment {
         self.jni.call_long_method(class, method, args)
     }
 
-    fn delete_local_ref(&self, obj: &JavaObject) -> Result<(), JNIError> {
-        self.jni.delete_local_ref(obj)
+    fn delete_local_ref(&self, object: &JavaObject) -> Result<(), JNIError> {
+        self.jni.delete_local_ref(object)
     }
 
     fn get_int_field(&self, obj: &JavaObject, field: &jfieldID) -> Result<jint, JNIError> {

@@ -129,7 +129,7 @@ pub trait JNI {
     fn get_method(&self, class: &JavaClass, name: &str, sig: &str) -> Result<MethodId, JNIError>;
     fn get_static_method(
         &self,
-        class: &ClassId,
+        class: &JavaClass,
         name: &str,
         sig: &str,
     ) -> Result<MethodId, JNIError>;
@@ -286,7 +286,7 @@ impl JNI for JNIEnvironment {
 
     fn get_static_method(
         &self,
-        class: &ClassId,
+        class: &JavaClass,
         method_name: &str,
         signature: &str,
     ) -> Result<MethodId, JNIError> {
@@ -296,7 +296,7 @@ impl JNI for JNIEnvironment {
         unsafe {
             let id: JavaMethod = (**self.jni).GetStaticMethodID.unwrap()(
                 self.jni,
-                class.native_id,
+                *class,
                 name.as_ptr(),
                 sig.as_ptr(),
             );

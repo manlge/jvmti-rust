@@ -22,7 +22,8 @@ use std::{ffi::CString, ptr};
 pub const JNI_VERSION_1_6: jint = 0x00010006;
 
 pub trait JVMF {
-    fn get_environment(&self) -> Result<Box<JVMTI>, NativeError>;
+    fn get_environment(&self) -> Result<Box<dyn JVMTI>, NativeError>;
+    fn get_jni_environment(&self) -> Result<Box<dyn JNI>, NativeError>;
     fn destroy(&self) -> Result<(), NativeError>;
     fn attach_current_thread(&self, thread_name: &str) -> Result<Box<dyn JNI>, NativeError>;
 }
@@ -93,6 +94,24 @@ impl JVMF for JVMAgent {
                 Ok(Box::new(JNIEnvironment::new(env as JNIEnvPtr)))
             } else {
                 Err(wrap_error(error))
+            }
+        }
+    }
+
+    fn get_jni_environment(&self) -> Result<Box<dyn JNI>, NativeError> {
+        unsafe {
+            let mut void_ptr: *mut c_void = ptr::null_mut() as *mut c_void;
+            let penv_ptr: *mut *mut c_void = &mut void_ptr as *mut *mut c_void;
+            let result =
+                wrap_error((**self.vm).GetEnv.unwrap()(self.vm, penv_ptr, JNI_VERSION_1_6) as u32);
+
+            match result {
+                NativeError::NoError => {
+                    let env_ptr: JNIEnvPtr = *penv_ptr as JNIEnvPtr;
+                    let env = JNIEnvironment::new(env_ptr);
+                    return Result::Ok(Box::new(env));
+                }
+                err @ _ => Result::Err(wrap_error(err as u32)),
             }
         }
     }

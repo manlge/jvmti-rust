@@ -40,7 +40,7 @@ pub trait JVMTI {
     /// function and set_event_notification_mode are called does not affect the result.
     fn set_event_callbacks(&mut self, callbacks: EventCallbacks) -> Option<NativeError>;
     fn set_event_notification_mode(&mut self, event: VMEvent, mode: bool) -> Option<NativeError>;
-    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError>;
+    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<jvmtiThreadInfo, NativeError>;
     fn get_method_declaring_class(&self, method_id: &jmethodID) -> Result<ClassId, NativeError>;
     fn get_method_name(&self, method_id: jmethodID) -> Result<MethodSignature, NativeError>;
     fn get_class_signature(&self, class: &jclass) -> Result<ClassSignature, NativeError>;
@@ -199,38 +199,14 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<Thread, NativeError> {
-        let mut info = Struct__jvmtiThreadInfo {
-            name: ptr::null_mut(),
-            priority: 0,
-            is_daemon: 0,
-            thread_group: ptr::null_mut(),
-            context_class_loader: ptr::null_mut(),
-        };
-        let info_ptr = &mut info;
-
+    fn get_thread_info(&self, thread_id: &JavaThread) -> Result<jvmtiThreadInfo, NativeError> {
+        let mut info = unsafe { std::mem::zeroed() };
         unsafe {
-            match (**self.jvmti).GetThreadInfo {
-                Some(func) => match wrap_error(func(self.jvmti, *thread_id, info_ptr)) {
-                    NativeError::NoError => Ok({
-                        let thread = Thread {
-                            id: ThreadId {
-                                native_id: *thread_id,
-                            },
-                            name: stringify((*info_ptr).name),
-                            priority: (*info_ptr).priority as u32,
-                            is_daemon: if (*info_ptr).is_daemon > 0 {
-                                true
-                            } else {
-                                false
-                            },
-                        };
-                        //todo free name array
-                        thread
-                    }),
-                    err @ _ => Err(err),
-                },
-                None => Err(NativeError::NoError),
+            match wrap_error((**self.jvmti).GetThreadInfo.unwrap()(
+                self.jvmti, *thread_id, &mut info,
+            )) {
+                NativeError::NoError => Ok(info),
+                err @ _ => Err(err),
             }
         }
     }
@@ -521,7 +497,7 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
         let mut count: jint = 0;
         let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
         let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
@@ -539,7 +515,7 @@ impl JVMTI for JVMTIEnvironment {
                     object_result_ptr,
                     count as usize,
                 )),
-                err @ _ => Err(err),
+                err => Err(err),
             }
         }
     }
