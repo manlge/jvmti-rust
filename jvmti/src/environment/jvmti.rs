@@ -5,11 +5,10 @@ use super::super::event::{EventCallbacks, VMEvent};
 use super::super::event_handler::*;
 use super::super::mem::MemoryAllocation;
 use super::super::method::MethodSignature;
-use super::super::native::jvmti_native::{jvmtiCapabilities, Struct__jvmtiThreadInfo};
+use super::super::native::jvmti_native::jvmtiCapabilities;
 use super::super::native::{
     JVMTIEnvPtr, JavaClass, JavaInstance, JavaLong, JavaObject, JavaThread, MutByteArray, MutString,
 };
-use super::super::thread::{Thread, ThreadId};
 use super::super::util::stringify;
 use super::super::version::VersionNumber;
 use super::{super::capabilities::Capabilities, jni::FALSE};
@@ -266,8 +265,8 @@ impl JVMTI for JVMTIEnvironment {
 
     fn get_class_signature(&self, class: &jclass) -> Result<ClassSignature, NativeError> {
         unsafe {
-            let mut generic: MutString = ptr::null_mut();
-            let mut signature: MutString = ptr::null_mut();
+            let mut generic: *mut i8 = ptr::null_mut();
+            let mut signature: *mut i8 = ptr::null_mut();
 
             match wrap_error((**self.jvmti).GetClassSignature.unwrap()(
                 self.jvmti,
@@ -278,9 +277,9 @@ impl JVMTI for JVMTIEnvironment {
                 NativeError::NoError => {
                     let rsignature = stringify(signature);
                     let x = JavaType::parse(&rsignature.as_str()).unwrap();
-                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, signature as *const u8 as _);
-                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, generic as *const u8 as _);
-                    Ok(ClassSignature::new(&x, rsignature.to_string()))
+                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, signature as _);
+                    (**self.jvmti).Deallocate.unwrap()(self.jvmti, generic as _);
+                    Ok(ClassSignature::new(x, rsignature.clone()))
                 }
                 err @ _ => Err(err),
             }
@@ -375,10 +374,7 @@ impl JVMTI for JVMTIEnvironment {
         slot: jint,
     ) -> Result<jobject, NativeError> {
         unsafe {
-            let mut value: Struct__jobject = Struct__jobject {
-                _hacky_hack_workaround: 0,
-            };
-            let mut value: jobject = &mut value;
+            let mut value: JavaObject = std::mem::zeroed();
             match wrap_error((**self.jvmti).GetLocalObject.unwrap()(
                 self.jvmti, thread, depth, slot, &mut value,
             )) {

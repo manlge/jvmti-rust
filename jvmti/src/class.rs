@@ -102,8 +102,8 @@ pub struct ClassSignature {
 }
 
 impl ClassSignature {
-    pub fn new(java_type: &JavaType, native_sig: String) -> ClassSignature {
-        let str = JavaType::to_string(java_type);
+    pub fn new(java_type: JavaType, native_sig: String) -> ClassSignature {
+        let str = JavaType::to_string(&java_type);
         match str.rfind('.') {
             Some(idx) => {
                 let (pkg, name) = str.split_at(idx + 1);
@@ -140,7 +140,7 @@ impl Class {
     pub fn new<'a>(id: ClassId, signature: JavaType<'a>, native_sig: String) -> Class {
         Class {
             id: id,
-            signature: ClassSignature::new(&signature, native_sig),
+            signature: ClassSignature::new(signature, native_sig),
         }
     }
 

@@ -124,7 +124,7 @@ impl JavaValue {
 ///
 pub trait JNI {
     /// Return an `ClassId` belonging to the given Java object instance.
-    fn get_object_class(&self, object_id: &JavaObject) -> Result<JavaClass, JNIError>;
+    fn get_object_class(&self, object: &JavaObject) -> Result<JavaClass, JNIError>;
     fn find_class(&self, clazz: &str) -> Result<ClassId, JNIError>;
     fn get_method(&self, class: &JavaClass, name: &str, sig: &str) -> Result<MethodId, JNIError>;
     fn get_static_method(
