@@ -81,7 +81,7 @@ pub trait JVMTI {
         heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
-    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
+    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
     fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError>;
     fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError>;
     fn get_loaded_classes(&self) -> Result<&[jclass], NativeError>;
@@ -493,7 +493,7 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
+    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
         let mut count: jint = 0;
         let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
         let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();

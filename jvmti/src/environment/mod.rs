@@ -177,8 +177,8 @@ impl JVMTI for Environment {
         )
     }
 
-    fn get_object_with_tag(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
-        self.jvmti.get_object_with_tag(tags_list)
+    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
+        self.jvmti.get_object_with_tags(tags_list)
     }
 
     fn iterate_over_heap(
