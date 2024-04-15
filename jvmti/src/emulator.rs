@@ -1,7 +1,11 @@
 use crate::{
-    environment::{jni::JNI, Environment},
-    native::jvmti_native::{
-        jclass, jlong, jmethodID, jobject, jthread, jvmtiFrameInfo, jvmtiThreadInfo,
+    environment::{jni::JNI, jvmti::JVMTIError, Environment},
+    native::{
+        jvmti_native::{
+            jclass, jlong, jmethodID, jobject, jrawMonitorID, jthread, jvmtiFrameInfo,
+            jvmtiThreadInfo,
+        },
+        JavaClass,
     },
 };
 
@@ -164,10 +168,7 @@ impl JVMTI for JVMEmulator {
         unimplemented!()
     }
 
-    fn raw_monitor_enter(
-        &self,
-        monitor: crate::native::jvmti_native::jrawMonitorID,
-    ) -> Result<(), NativeError> {
+    fn raw_monitor_enter(&self, monitor: &jrawMonitorID) -> Result<(), NativeError> {
         todo!()
     }
 
@@ -210,7 +211,7 @@ impl JVMTI for JVMEmulator {
         todo!()
     }
 
-    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError> {
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], JVMTIError> {
         todo!()
     }
 
@@ -246,14 +247,27 @@ impl JVMTI for JVMEmulator {
         todo!()
     }
 
-    fn is_array_class(
-        &self,
-        class: crate::native::jvmti_native::jclass,
-    ) -> Result<bool, NativeError> {
+    fn is_array_class(&self, class: &JavaClass) -> Result<bool, NativeError> {
         todo!()
     }
 
     fn force_garbage_collection(&self) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn iterate_over_objects_reachable_from_object(
+        &self,
+        object: &jobject,
+        callbck: crate::native::jvmti_native::jvmtiObjectReferenceCallback,
+        user_data: *const std::os::raw::c_void,
+    ) -> Result<(), NativeError> {
+        todo!()
+    }
+
+    fn get_object_hash_code(
+        &self,
+        object: &jobject,
+    ) -> Result<crate::native::jvmti_native::jint, NativeError> {
         todo!()
     }
 }

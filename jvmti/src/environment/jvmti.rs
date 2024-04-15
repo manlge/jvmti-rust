@@ -16,7 +16,18 @@ use super::{
     super::class::{ClassId, ClassSignature, JavaType},
     jni::TRUE,
 };
+
 use std::{ffi::CString, os::raw::c_void, ptr};
+#[derive(Debug)]
+pub enum JVMTIError {
+    NativeError(NativeError),
+}
+
+impl std::fmt::Display for JVMTIError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Native Error {}", self.to_string())
+    }
+}
 
 pub trait JVMTI {
     ///
@@ -63,7 +74,7 @@ pub trait JVMTI {
     fn get_stack_trace(&self, thread: jthread) -> Result<&[jvmtiFrameInfo], NativeError>;
     fn get_thread_state(&self, thread: jthread) -> Result<u32, NativeError>;
     fn add_to_bootstrap_classloader_search(&self, class_path: &str) -> Result<(), NativeError>;
-    fn raw_monitor_enter(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
+    fn raw_monitor_enter(&self, monitor: &jrawMonitorID) -> Result<(), NativeError>;
     fn raw_monitor_exit(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
     fn create_raw_monitor(&self, name: &str) -> Result<jrawMonitorID, NativeError>;
     fn destroy_raw_monitor(&self, monitor: jrawMonitorID) -> Result<(), NativeError>;
@@ -81,16 +92,23 @@ pub trait JVMTI {
         heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
-    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], NativeError>;
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], JVMTIError>;
     fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError>;
     fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError>;
+    fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError>;
     fn get_loaded_classes(&self) -> Result<&[jclass], NativeError>;
     fn get_class_loader_classes(
         &self,
         initiating_loader: &jobject,
     ) -> Result<&[jclass], NativeError>;
-    fn is_array_class(&self, class: jclass) -> Result<bool, NativeError>;
+    fn is_array_class(&self, class: &JavaClass) -> Result<bool, NativeError>;
     fn force_garbage_collection(&self) -> Result<(), NativeError>;
+    fn iterate_over_objects_reachable_from_object(
+        &self,
+        object: &jobject,
+        callbck: jvmtiObjectReferenceCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError>;
 }
 
 pub struct JVMTIEnvironment {
@@ -397,9 +415,11 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn raw_monitor_enter(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
+    fn raw_monitor_enter(&self, monitor: &jrawMonitorID) -> Result<(), NativeError> {
         unsafe {
-            match wrap_error((**self.jvmti).RawMonitorEnter.unwrap()(self.jvmti, monitor)) {
+            match wrap_error((**self.jvmti).RawMonitorEnter.unwrap()(
+                self.jvmti, *monitor,
+            )) {
                 NativeError::NoError => Ok(()),
                 err @ _ => Err(err),
             }
@@ -493,10 +513,10 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], JVMTIError> {
         let mut count: jint = 0;
         let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
-        let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
+        // let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
 
         unsafe {
             match wrap_error((**self.jvmti).GetObjectsWithTags.unwrap()(
@@ -505,13 +525,15 @@ impl JVMTI for JVMTIEnvironment {
                 tags_list.as_ptr(),
                 &mut count,
                 &mut object_result_ptr,
-                &mut tag_result_ptr,
+                std::ptr::null_mut(),
             )) {
-                NativeError::NoError => Ok(std::slice::from_raw_parts(
-                    object_result_ptr,
-                    count as usize,
-                )),
-                err => Err(err),
+                NativeError::NoError => {
+                    let objects = std::slice::from_raw_parts(object_result_ptr, count as usize);
+                    return Result::Ok(objects);
+                }
+                err => {
+                    return Err(JVMTIError::NativeError(err));
+                }
             }
         }
     }
@@ -555,6 +577,20 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
+    fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError> {
+        let mut hash_code: jint = 0;
+        unsafe {
+            match wrap_error((**self.jvmti).GetObjectHashCode.unwrap()(
+                self.jvmti,
+                *object,
+                &mut hash_code,
+            )) {
+                NativeError::NoError => Ok(hash_code),
+                err @ _ => Err(err),
+            }
+        }
+    }
+
     fn get_loaded_classes(&self) -> Result<&[jclass], NativeError> {
         let mut count: jint = 0;
         let mut classes: *mut jclass = std::ptr::null_mut();
@@ -589,12 +625,12 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn is_array_class(&self, class: jclass) -> Result<bool, NativeError> {
+    fn is_array_class(&self, class: &JavaClass) -> Result<bool, NativeError> {
         let mut is_array: jboolean = FALSE;
         unsafe {
             match wrap_error((**self.jvmti).IsArrayClass.unwrap()(
                 self.jvmti,
-                class,
+                *class,
                 &mut is_array,
             )) {
                 NativeError::NoError => Ok(is_array == TRUE),
@@ -608,6 +644,24 @@ impl JVMTI for JVMTIEnvironment {
             match wrap_error((**self.jvmti).ForceGarbageCollection.unwrap()(self.jvmti)) {
                 NativeError::NoError => Ok(()),
                 err @ _ => Err(err),
+            }
+        }
+    }
+
+    fn iterate_over_objects_reachable_from_object(
+        &self,
+        object: &jobject,
+        callbck: jvmtiObjectReferenceCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError> {
+        unsafe {
+            match wrap_error((**self.jvmti)
+                .IterateOverObjectsReachableFromObject
+                .unwrap()(
+                self.jvmti, *object, callbck, user_data
+            )) {
+                NativeError::NoError => Ok(()),
+                err => Err(err),
             }
         }
     }

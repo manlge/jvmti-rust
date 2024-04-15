@@ -38,6 +38,7 @@ pub fn wrap_error(code: u32) -> NativeError {
         15 => NativeError::ThreadNotAlive,
         JVMTI_ERROR_INVALID_MONITOR => NativeError::InvalidMonitor,
         JVMTI_ERROR_NOT_MONITOR_OWNER => NativeError::NotMonitorOwner,
+        JVMTI_ERROR_ILLEGAL_ARGUMENT => NativeError::IllegalArgument,
         _ => {
             eprintln!("Unknown error code was detected: {}", code);
             NativeError::UnknownError

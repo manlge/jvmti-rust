@@ -2,8 +2,11 @@ use std::os::raw::c_void;
 
 use crate::native::{jvmti_native::*, JavaClass, JavaMethod, JavaObjectArray};
 
-use self::jni::{JNIEnvironment, JNIError, JNI};
 use self::jvmti::{JVMTIEnvironment, JVMTI};
+use self::{
+    jni::{JNIEnvironment, JNIError, JNI},
+    jvmti::JVMTIError,
+};
 use super::capabilities::Capabilities;
 use super::class::{ClassId, ClassSignature};
 use super::error::NativeError;
@@ -126,10 +129,7 @@ impl JVMTI for Environment {
         self.jvmti.add_to_bootstrap_classloader_search(class_path)
     }
 
-    fn raw_monitor_enter(
-        &self,
-        monitor: crate::native::jvmti_native::jrawMonitorID,
-    ) -> Result<(), NativeError> {
+    fn raw_monitor_enter(&self, monitor: &jrawMonitorID) -> Result<(), NativeError> {
         self.jvmti.raw_monitor_enter(monitor)
     }
 
@@ -177,8 +177,8 @@ impl JVMTI for Environment {
         )
     }
 
-    fn get_object_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], NativeError> {
-        self.jvmti.get_object_with_tags(tags_list)
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], JVMTIError> {
+        self.jvmti.get_objects_with_tags(tags_list)
     }
 
     fn iterate_over_heap(
@@ -214,15 +214,26 @@ impl JVMTI for Environment {
         self.jvmti.get_class_loader_classes(initiating_loader)
     }
 
-    fn is_array_class(
-        &self,
-        class: crate::native::jvmti_native::jclass,
-    ) -> Result<bool, NativeError> {
+    fn is_array_class(&self, class: &JavaClass) -> Result<bool, NativeError> {
         self.jvmti.is_array_class(class)
     }
 
     fn force_garbage_collection(&self) -> Result<(), NativeError> {
         self.jvmti.force_garbage_collection()
+    }
+
+    fn iterate_over_objects_reachable_from_object(
+        &self,
+        object: &jobject,
+        callbck: jvmtiObjectReferenceCallback,
+        user_data: *const c_void,
+    ) -> Result<(), NativeError> {
+        self.jvmti
+            .iterate_over_objects_reachable_from_object(object, callbck, user_data)
+    }
+
+    fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError> {
+        self.jvmti.get_object_hash_code(object)
     }
 }
 

@@ -172,10 +172,13 @@ pub trait JNI {
         method: &JavaMethod,
         args: &[JavaValue],
     ) -> Result<JavaObject, JNIError>;
-    fn delete_local_ref(&self, obj: &JavaObject) -> Result<(), JNIError>;
-    fn get_int_field(&self, obj: &JavaObject, field: &JavaField) -> Result<jint, JNIError>;
-    fn get_object_field(&self, obj: &JavaObject, field: &JavaField)
-        -> Result<JavaObject, JNIError>;
+    fn delete_local_ref(&self, object: &JavaObject) -> Result<(), JNIError>;
+    fn get_int_field(&self, object: &JavaObject, field: &JavaField) -> Result<jint, JNIError>;
+    fn get_object_field(
+        &self,
+        object: &JavaObject,
+        field: &JavaField,
+    ) -> Result<JavaObject, JNIError>;
     fn get_array_length(&self, array: &JavaArray) -> Result<jsize, JNIError>;
     fn get_object_array_element(
         &self,
