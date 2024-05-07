@@ -211,7 +211,7 @@ impl JVMTI for JVMEmulator {
         todo!()
     }
 
-    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], JVMTIError> {
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<Option<&[jobject]>, JVMTIError> {
         todo!()
     }
 

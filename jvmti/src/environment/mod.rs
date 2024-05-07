@@ -177,7 +177,7 @@ impl JVMTI for Environment {
         )
     }
 
-    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], JVMTIError> {
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<Option<&[jobject]>, JVMTIError> {
         self.jvmti.get_objects_with_tags(tags_list)
     }
 

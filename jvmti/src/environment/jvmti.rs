@@ -92,7 +92,7 @@ pub trait JVMTI {
         heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
-    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[jobject], JVMTIError>;
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<Option<&[jobject]>, JVMTIError>;
     fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError>;
     fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError>;
     fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError>;
@@ -513,7 +513,7 @@ impl JVMTI for JVMTIEnvironment {
         }
     }
 
-    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<&[JavaObject], JVMTIError> {
+    fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<Option<&[jobject]>, JVMTIError> {
         let mut count: jint = 0;
         let mut object_result_ptr: *mut jobject = std::ptr::null_mut();
         // let mut tag_result_ptr: *mut jlong = std::ptr::null_mut();
@@ -528,8 +528,11 @@ impl JVMTI for JVMTIEnvironment {
                 std::ptr::null_mut(),
             )) {
                 NativeError::NoError => {
+                    if count == 0 {
+                        return Ok(None);
+                    }
                     let objects = std::slice::from_raw_parts(object_result_ptr, count as usize);
-                    return Result::Ok(objects);
+                    return Result::Ok(Some(objects));
                 }
                 err => {
                     return Err(JVMTIError::NativeError(err));
