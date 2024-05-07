@@ -109,6 +109,14 @@ pub trait JVMTI {
         callbck: jvmtiObjectReferenceCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
+    fn follow_references(
+        &self,
+        heap_filter: jint,
+        klass: &JavaClass,
+        initial_object: &JavaObject,
+        callbacks: *const jvmtiHeapCallbacks,
+        user_data: *const c_void,
+    );
 }
 
 pub struct JVMTIEnvironment {
@@ -665,6 +673,29 @@ impl JVMTI for JVMTIEnvironment {
             )) {
                 NativeError::NoError => Ok(()),
                 err => Err(err),
+            }
+        }
+    }
+
+    fn follow_references(
+        &self,
+        heap_filter: jint,
+        klass: &JavaClass,
+        initial_object: &JavaObject,
+        callbacks: *const jvmtiHeapCallbacks,
+        user_data: *const c_void,
+    ) {
+        unsafe {
+            match wrap_error((**self.jvmti).FollowReferences.unwrap()(
+                self.jvmti,
+                heap_filter,
+                *klass,
+                *initial_object,
+                callbacks,
+                user_data,
+            )) {
+                NativeError::NoError => {}
+                err @ _ => {}
             }
         }
     }

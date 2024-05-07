@@ -235,6 +235,18 @@ impl JVMTI for Environment {
     fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError> {
         self.jvmti.get_object_hash_code(object)
     }
+
+    fn follow_references(
+        &self,
+        heap_filter: jint,
+        klass: &JavaClass,
+        initial_object: &JavaObject,
+        callbacks: *const jvmtiHeapCallbacks,
+        user_data: *const c_void,
+    ) {
+        self.jvmti
+            .follow_references(heap_filter, klass, initial_object, callbacks, user_data);
+    }
 }
 
 impl JNI for Environment {

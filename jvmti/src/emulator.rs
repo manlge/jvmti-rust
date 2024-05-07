@@ -270,4 +270,15 @@ impl JVMTI for JVMEmulator {
     ) -> Result<crate::native::jvmti_native::jint, NativeError> {
         todo!()
     }
+
+    fn follow_references(
+        &self,
+        heap_filter: crate::native::jvmti_native::jint,
+        klass: &JavaClass,
+        initial_object: &crate::native::JavaObject,
+        callbacks: *const crate::native::jvmti_native::jvmtiHeapCallbacks,
+        user_data: *const std::os::raw::c_void,
+    ) {
+        todo!()
+    }
 }
