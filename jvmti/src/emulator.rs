@@ -203,7 +203,7 @@ impl JVMTI for JVMEmulator {
 
     fn iterate_over_instances_of_class(
         &self,
-        klass: crate::native::jvmti_native::jclass,
+        klass: &crate::native::jvmti_native::jclass,
         object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
         heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
         user_data: *const std::os::raw::c_void,
@@ -279,6 +279,10 @@ impl JVMTI for JVMEmulator {
         callbacks: *const crate::native::jvmti_native::jvmtiHeapCallbacks,
         user_data: *const std::os::raw::c_void,
     ) {
+        todo!()
+    }
+
+    fn set_tag(&self, object: &crate::native::JavaObject, tag: jlong) -> Result<(), JVMTIError> {
         todo!()
     }
 }

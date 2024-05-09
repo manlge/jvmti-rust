@@ -1,6 +1,5 @@
-use std::os::raw::c_void;
-
 use crate::native::{jvmti_native::*, JavaClass, JavaMethod, JavaObjectArray};
+use std::os::raw::c_void;
 
 use self::jvmti::{JVMTIEnvironment, JVMTI};
 use self::{
@@ -97,26 +96,23 @@ impl JVMTI for Environment {
 
     fn run_agent_thread(
         &self,
-        thread: crate::native::jvmti_native::jthread,
-        proc: crate::native::jvmti_native::jvmtiStartFunction,
+        thread: jthread,
+        proc: jvmtiStartFunction,
         arg: *const std::os::raw::c_void,
-        priority: crate::native::jvmti_native::jint,
+        priority: jint,
     ) -> Result<(), NativeError> {
         self.jvmti.run_agent_thread(thread, proc, arg, priority)
     }
 
-    fn get_stack_trace(
-        &self,
-        thread: crate::native::jvmti_native::jthread,
-    ) -> Result<&[jvmtiFrameInfo], NativeError> {
+    fn get_stack_trace(&self, thread: jthread) -> Result<&[jvmtiFrameInfo], NativeError> {
         self.jvmti.get_stack_trace(thread)
     }
 
     fn get_local_object(
         &self,
-        thread: crate::native::jvmti_native::jthread,
-        depth: crate::native::jvmti_native::jint,
-        slot: crate::native::jvmti_native::jint,
+        thread: jthread,
+        depth: jint,
+        slot: jint,
     ) -> Result<JavaObject, NativeError> {
         self.jvmti.get_local_object(thread, depth, slot)
     }
@@ -133,40 +129,27 @@ impl JVMTI for Environment {
         self.jvmti.raw_monitor_enter(monitor)
     }
 
-    fn raw_monitor_exit(
-        &self,
-        monitor: crate::native::jvmti_native::jrawMonitorID,
-    ) -> Result<(), NativeError> {
+    fn raw_monitor_exit(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
         self.jvmti.raw_monitor_exit(monitor)
     }
 
-    fn create_raw_monitor(
-        &self,
-        name: &str,
-    ) -> Result<crate::native::jvmti_native::jrawMonitorID, NativeError> {
+    fn create_raw_monitor(&self, name: &str) -> Result<jrawMonitorID, NativeError> {
         self.jvmti.create_raw_monitor(name)
     }
 
-    fn destroy_raw_monitor(
-        &self,
-        monitor: crate::native::jvmti_native::jrawMonitorID,
-    ) -> Result<(), NativeError> {
+    fn destroy_raw_monitor(&self, monitor: jrawMonitorID) -> Result<(), NativeError> {
         self.jvmti.destroy_raw_monitor(monitor)
     }
 
-    fn retransform_classes(
-        &self,
-        count: crate::native::jvmti_native::jint,
-        class: *const crate::native::jvmti_native::jclass,
-    ) -> Result<(), NativeError> {
+    fn retransform_classes(&self, count: jint, class: *const jclass) -> Result<(), NativeError> {
         self.jvmti.retransform_classes(count, class)
     }
 
     fn iterate_over_instances_of_class(
         &self,
-        klass: crate::native::jvmti_native::jclass,
-        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
-        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        klass: &jclass,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const std::os::raw::c_void,
     ) -> Result<(), NativeError> {
         self.jvmti.iterate_over_instances_of_class(
@@ -183,8 +166,8 @@ impl JVMTI for Environment {
 
     fn iterate_over_heap(
         &self,
-        object_filter: crate::native::jvmti_native::jvmtiHeapObjectFilter,
-        heap_object_callback: crate::native::jvmti_native::jvmtiHeapObjectCallback,
+        object_filter: jvmtiHeapObjectFilter,
+        heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError> {
         self.jvmti
@@ -210,7 +193,7 @@ impl JVMTI for Environment {
     fn get_class_loader_classes(
         &self,
         initiating_loader: &JavaObject,
-    ) -> Result<&[crate::native::jvmti_native::jclass], NativeError> {
+    ) -> Result<&[jclass], NativeError> {
         self.jvmti.get_class_loader_classes(initiating_loader)
     }
 
@@ -246,6 +229,10 @@ impl JVMTI for Environment {
     ) {
         self.jvmti
             .follow_references(heap_filter, klass, initial_object, callbacks, user_data);
+    }
+
+    fn set_tag(&self, object: &JavaObject, tag: jlong) -> Result<(), JVMTIError> {
+        self.jvmti.set_tag(object, tag)
     }
 }
 

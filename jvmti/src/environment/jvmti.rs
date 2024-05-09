@@ -87,12 +87,13 @@ pub trait JVMTI {
     ) -> Result<(), NativeError>;
     fn iterate_over_instances_of_class(
         &self,
-        klass: jclass,
+        klass: &jclass,
         object_filter: jvmtiHeapObjectFilter,
         heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
     ) -> Result<(), NativeError>;
     fn get_objects_with_tags(&self, tags_list: &[jlong]) -> Result<Option<&[jobject]>, JVMTIError>;
+    fn set_tag(&self, object: &JavaObject, tag: jlong) -> Result<(), JVMTIError>;
     fn get_classloader(&self, klass: &jclass) -> Result<jobject, NativeError>;
     fn get_object_size(&self, object: &jobject) -> Result<jlong, NativeError>;
     fn get_object_hash_code(&self, object: &jobject) -> Result<jint, NativeError>;
@@ -502,7 +503,7 @@ impl JVMTI for JVMTIEnvironment {
 
     fn iterate_over_instances_of_class(
         &self,
-        klass: jclass,
+        klass: &jclass,
         object_filter: jvmtiHeapObjectFilter,
         heap_object_callback: jvmtiHeapObjectCallback,
         user_data: *const c_void,
@@ -510,7 +511,7 @@ impl JVMTI for JVMTIEnvironment {
         unsafe {
             match wrap_error((**self.jvmti).IterateOverInstancesOfClass.unwrap()(
                 self.jvmti,
-                klass,
+                *klass,
                 object_filter,
                 heap_object_callback,
                 user_data,
@@ -542,6 +543,17 @@ impl JVMTI for JVMTIEnvironment {
                     let objects = std::slice::from_raw_parts(object_result_ptr, count as usize);
                     return Result::Ok(Some(objects));
                 }
+                err => {
+                    return Err(JVMTIError::NativeError(err));
+                }
+            }
+        }
+    }
+
+    fn set_tag(&self, object: &JavaObject, tag: jlong) -> Result<(), JVMTIError> {
+        unsafe {
+            match wrap_error((**self.jvmti).SetTag.unwrap()(self.jvmti, *object, tag)) {
+                NativeError::NoError => Ok(()),
                 err => {
                     return Err(JVMTIError::NativeError(err));
                 }
